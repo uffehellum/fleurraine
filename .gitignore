@@ -34,3 +34,8 @@ coverage/
 tmp/
 temp/
 .kiro/
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
