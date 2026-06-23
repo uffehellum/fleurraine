@@ -1,6 +1,6 @@
 module github.com/uffehellum/fleurraine
 
-go 1.26.4
+go 1.23
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.51.0 // indirect
