@@ -1,0 +1,36 @@
+# Environment variables
+.env
+*.env
+!.env.example
+web/.env.local
+
+# Go build artifacts
+/fleurraine
+/cmd/server/fleurraine
+/server
+
+# Frontend build output
+web/dist/
+web/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Test coverage
+coverage/
+*.out
+
+# Temporary files
+tmp/
+temp/
+.kiro/

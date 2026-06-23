@@ -1,0 +1,1 @@
+This directory is replaced with the compiled React frontend (web/dist) during Docker build.
