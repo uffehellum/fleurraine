@@ -592,8 +592,9 @@ func (s *Service) GetPhotoByShareToken(ctx context.Context, token string) (*Phot
 // ListPhotos returns photos filtered by category and status.
 func (s *Service) ListPhotos(ctx context.Context, category, status string, limit int) ([]*Photo, error) {
 	query := `
-		SELECT id, category, status, storage_key_thumb, storage_key_mobile,
-		       exif_taken_at, flower_name, description, uploaded_at, published_at, share_token
+		SELECT id, category, status, storage_key_thumb, storage_key_mobile, storage_key_orig,
+		       exif_taken_at, flower_name, description, uploaded_at, published_at, share_token,
+		       ai_analysis, is_review, review_approved, camera_model
 		FROM photos
 		WHERE 1=1
 	`
@@ -627,13 +628,21 @@ func (s *Service) ListPhotos(ctx context.Context, category, status string, limit
 	photos := make([]*Photo, 0)
 	for rows.Next() {
 		var p Photo
+		var aiAnalysisJSON []byte
 		err := rows.Scan(
-			&p.ID, &p.Category, &p.Status, &p.StorageKeyThumb, &p.StorageKeyMobile,
+			&p.ID, &p.Category, &p.Status, &p.StorageKeyThumb, &p.StorageKeyMobile, &p.StorageKeyOrig,
 			&p.EXIFTakenAt, &p.FlowerName, &p.Description, &p.UploadedAt, &p.PublishedAt, &p.ShareToken,
+			&aiAnalysisJSON, &p.IsReview, &p.ReviewApproved, &p.CameraModel,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("photos: scan row: %w", err)
 		}
+
+		// Parse AI analysis JSON
+		if len(aiAnalysisJSON) > 0 {
+			json.Unmarshal(aiAnalysisJSON, &p.AIAnalysis)
+		}
+
 		photos = append(photos, &p)
 	}
 	if err := rows.Err(); err != nil {

@@ -74,13 +74,19 @@ export default function PhotoDisplay({ photo, showDetails = false, onShare }: Ph
           alt={photo.flower_name || 'Photo'}
           className="w-full h-auto cursor-pointer hover:opacity-95 transition-opacity"
           onClick={() => setShowFullSize(true)}
+          style={{ imageOrientation: 'from-image' }}
         />
         
         {/* Category badge */}
-        <div className="absolute top-2 left-2">
+        <div className="absolute top-2 left-2 flex gap-2">
           <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
             {photo.category}
           </span>
+          {photo.ai_analysis && (
+            <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+              🤖 AI
+            </span>
+          )}
         </div>
       </div>
 
@@ -170,11 +176,15 @@ export default function PhotoDisplay({ photo, showDetails = false, onShare }: Ph
               src={getImageUrl(photo.storage_key_orig)}
               alt={photo.flower_name || 'Photo'}
               className="max-w-full max-h-[90vh] object-contain"
+              style={{ imageOrientation: 'from-image' }}
             />
             <button
-              onClick={() => setShowFullSize(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFullSize(false);
+              }}
               className="absolute top-4 right-4 bg-white text-gray-800 rounded-full p-2
-                hover:bg-gray-100 transition-colors"
+                hover:bg-gray-100 transition-colors z-10"
             >
               <svg
                 className="w-6 h-6"
