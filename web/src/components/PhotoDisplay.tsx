@@ -103,7 +103,7 @@ export default function PhotoDisplay({ photo, showDetails = false, onShare }: Ph
             </p>
           )}
 
-          {photo.ai_analysis?.subjects && photo.ai_analysis.subjects.length > 0 && (
+          {photo.ai_analysis?.subjects && Array.isArray(photo.ai_analysis.subjects) && photo.ai_analysis.subjects.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {photo.ai_analysis.subjects.map((subject, idx) => (
                 <span

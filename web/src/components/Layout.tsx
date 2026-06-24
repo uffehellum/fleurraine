@@ -51,17 +51,19 @@ export default function Layout() {
               </svg>
             </button>
 
-            {/* Desktop navigation */}
+            {/* Desktop navigation - icon only with hover labels */}
             <nav className="hidden md:flex items-center gap-x-1 text-sm">
               {publicLinks.map(({ to, label, icon }) => (
                 <Link
                   key={to}
                   to={to}
-                  className="rounded-md px-3 py-2 hover:bg-text/5 min-h-[44px] inline-flex items-center gap-2"
+                  className="group relative rounded-md px-3 py-2 hover:bg-text/5 min-h-[44px] inline-flex items-center"
                   title={label}
                 >
-                  <span className="text-lg">{icon}</span>
-                  <span className="hidden lg:inline">{label}</span>
+                  <span className="text-xl">{icon}</span>
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    {label}
+                  </span>
                 </Link>
               ))}
               {isAdmin &&
@@ -69,11 +71,13 @@ export default function Layout() {
                   <Link
                     key={to}
                     to={to}
-                    className="rounded-md px-3 py-2 font-medium text-accent hover:bg-accent/10 min-h-[44px] inline-flex items-center gap-2"
+                    className="group relative rounded-md px-3 py-2 font-medium text-accent hover:bg-accent/10 min-h-[44px] inline-flex items-center"
                     title={label}
                   >
-                    <span className="text-lg">{icon}</span>
-                    <span className="hidden lg:inline">{label}</span>
+                    <span className="text-xl">{icon}</span>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-accent text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      {label}
+                    </span>
                   </Link>
                 ))}
             </nav>
