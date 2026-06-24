@@ -1,83 +1,170 @@
 import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useState } from "react";
 
 const publicLinks = [
-  { to: "/", label: "Home" },
-  { to: "/flowers", label: "Flowers" },
-  { to: "/garden", label: "Garden" },
-  { to: "/bouquets", label: "Bouquets" },
-  { to: "/season", label: "Season" },
-  { to: "/orders", label: "Orders" },
-  { to: "/subscribe", label: "Subscribe" },
+  { to: "/", label: "Home", icon: "🏠" },
+  { to: "/flowers", label: "Flowers", icon: "🌸" },
+  { to: "/garden", label: "Garden", icon: "🌿" },
+  { to: "/bouquets", label: "Bouquets", icon: "💐" },
+  { to: "/season", label: "Season", icon: "📅" },
+  { to: "/orders", label: "Orders", icon: "📦" },
+  { to: "/subscribe", label: "Subscribe", icon: "⭐" },
 ];
 
 const adminLinks = [
-  { to: "/admin/queue", label: "Queue" },
-  { to: "/admin/orders", label: "Orders" },
-  { to: "/admin/analytics", label: "Analytics" },
+  { to: "/admin/queue", label: "Queue", icon: "📋" },
+  { to: "/admin/orders", label: "Orders", icon: "📊" },
+  { to: "/admin/analytics", label: "Analytics", icon: "📈" },
+  { to: "/admin/photos", label: "Photos", icon: "📸" },
 ];
 
 export default function Layout() {
   const { user, isAdmin, loading, signOut } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-text/10 bg-bg">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <Link
-            to="/"
-            className="font-heading text-xl tracking-wide text-accent"
-          >
-            Fleurraine
-          </Link>
+        <div className="mx-auto max-w-5xl px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Link
+              to="/"
+              className="font-heading text-xl tracking-wide text-accent"
+            >
+              Fleurraine
+            </Link>
 
-          <nav className="flex flex-wrap items-center gap-x-1 gap-y-2 text-sm">
-            {publicLinks.map(({ to, label }) => (
-              <Link
-                key={to}
-                to={to}
-                className="rounded-md px-3 py-2 hover:bg-text/5 min-h-[44px] inline-flex items-center"
-              >
-                {label}
-              </Link>
-            ))}
-            {isAdmin &&
-              adminLinks.map(({ to, label }) => (
+            {/* Mobile menu button */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="md:hidden rounded-md p-2 hover:bg-text/5 min-h-[44px] min-w-[44px]"
+              aria-label="Toggle menu"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {menuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
+
+            {/* Desktop navigation */}
+            <nav className="hidden md:flex items-center gap-x-1 text-sm">
+              {publicLinks.map(({ to, label, icon }) => (
                 <Link
                   key={to}
                   to={to}
-                  className="rounded-md px-3 py-2 font-medium text-accent hover:bg-accent/10 min-h-[44px] inline-flex items-center"
+                  className="rounded-md px-3 py-2 hover:bg-text/5 min-h-[44px] inline-flex items-center gap-2"
+                  title={label}
                 >
-                  {label}
+                  <span className="text-lg">{icon}</span>
+                  <span className="hidden lg:inline">{label}</span>
                 </Link>
               ))}
-          </nav>
+              {isAdmin &&
+                adminLinks.map(({ to, label, icon }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    className="rounded-md px-3 py-2 font-medium text-accent hover:bg-accent/10 min-h-[44px] inline-flex items-center gap-2"
+                    title={label}
+                  >
+                    <span className="text-lg">{icon}</span>
+                    <span className="hidden lg:inline">{label}</span>
+                  </Link>
+                ))}
+            </nav>
 
-          <div className="flex items-center gap-3 text-sm">
-            {loading ? (
-              <span className="text-text/50">…</span>
-            ) : user ? (
-              <>
-                <span className="hidden sm:inline text-text/70">
-                  {user.displayName}
-                </span>
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="rounded-md border border-text/20 px-3 py-2 min-h-[44px] hover:bg-text/5"
+            {/* Desktop user menu */}
+            <div className="hidden md:flex items-center gap-3 text-sm">
+              {loading ? (
+                <span className="text-text/50">…</span>
+              ) : user ? (
+                <>
+                  <span className="hidden lg:inline text-text/70">
+                    {user.displayName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    className="rounded-md border border-text/20 px-3 py-2 min-h-[44px] hover:bg-text/5"
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/sign-in"
+                  className="rounded-md bg-accent px-4 py-2 font-medium text-white min-h-[44px] inline-flex items-center hover:bg-accent/90"
                 >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <Link
-                to="/sign-in"
-                className="rounded-md bg-accent px-4 py-2 font-medium text-white min-h-[44px] inline-flex items-center hover:bg-accent/90"
-              >
-                Sign in
-              </Link>
-            )}
+                  Sign in
+                </Link>
+              )}
+            </div>
           </div>
+
+          {/* Mobile menu */}
+          {menuOpen && (
+            <div className="md:hidden mt-4 pb-4 border-t border-text/10 pt-4">
+              <nav className="flex flex-col gap-2">
+                {publicLinks.map(({ to, label, icon }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-md px-4 py-3 hover:bg-text/5 flex items-center gap-3 text-base"
+                  >
+                    <span className="text-xl">{icon}</span>
+                    <span>{label}</span>
+                  </Link>
+                ))}
+                {isAdmin &&
+                  adminLinks.map(({ to, label, icon }) => (
+                    <Link
+                      key={to}
+                      to={to}
+                      onClick={() => setMenuOpen(false)}
+                      className="rounded-md px-4 py-3 font-medium text-accent hover:bg-accent/10 flex items-center gap-3 text-base"
+                    >
+                      <span className="text-xl">{icon}</span>
+                      <span>{label}</span>
+                    </Link>
+                  ))}
+                <div className="border-t border-text/10 mt-2 pt-2">
+                  {loading ? (
+                    <span className="text-text/50 px-4">…</span>
+                  ) : user ? (
+                    <>
+                      <div className="px-4 py-2 text-text/70 text-sm">
+                        {user.displayName}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          signOut();
+                          setMenuOpen(false);
+                        }}
+                        className="w-full text-left rounded-md px-4 py-3 hover:bg-text/5 text-base"
+                      >
+                        Sign out
+                      </button>
+                    </>
+                  ) : (
+                    <Link
+                      to="/sign-in"
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded-md bg-accent px-4 py-3 font-medium text-white text-center hover:bg-accent/90"
+                    >
+                      Sign in
+                    </Link>
+                  )}
+                </div>
+              </nav>
+            </div>
+          )}
         </div>
       </header>
 
