@@ -2,31 +2,17 @@ import { useState } from 'react';
 
 interface ImageUploadProps {
   onUploadSuccess?: (photo: any) => void;
-  category?: string;
   isReview?: boolean;
-  showCategorySelect?: boolean;
-  showFlowerFields?: boolean;
 }
 
 export default function ImageUpload({
   onUploadSuccess,
-  category = '',
   isReview = false,
-  showCategorySelect = false,
-  showFlowerFields = false,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
-  // Form fields
-  const [selectedCategory, setSelectedCategory] = useState(category);
-  const [flowerName, setFlowerName] = useState('');
-  const [wikipediaUrl, setWikipediaUrl] = useState('');
-  const [harvestSeason, setHarvestSeason] = useState('');
-  const [rowNumber, setRowNumber] = useState('');
-  const [description, setDescription] = useState('');
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -69,13 +55,6 @@ export default function ImageUpload({
     try {
       const formData = new FormData();
       formData.append('image', selectedFile);
-      
-      if (selectedCategory) formData.append('category', selectedCategory);
-      if (flowerName) formData.append('flower_name', flowerName);
-      if (wikipediaUrl) formData.append('wikipedia_url', wikipediaUrl);
-      if (harvestSeason) formData.append('harvest_season', harvestSeason);
-      if (rowNumber) formData.append('row_number', rowNumber);
-      if (description) formData.append('description', description);
       if (isReview) formData.append('is_review', 'true');
 
       const response = await fetch('/api/photos/upload', {
@@ -94,11 +73,6 @@ export default function ImageUpload({
       // Reset form
       setSelectedFile(null);
       setPreview(null);
-      setFlowerName('');
-      setWikipediaUrl('');
-      setHarvestSeason('');
-      setRowNumber('');
-      setDescription('');
       
       if (onUploadSuccess) {
         onUploadSuccess(photo);
@@ -112,151 +86,93 @@ export default function ImageUpload({
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="font-heading text-xl mb-4">
-        {isReview ? 'Upload Review Photo' : 'Upload Photo'}
+      <h2 className="font-heading text-2xl mb-2">
+        {isReview ? 'Share Your Flowers' : 'Add Photo'}
       </h2>
+      <p className="text-gray-600 text-sm mb-6">
+        {isReview 
+          ? 'Take a photo of your Fleurraine bouquet to share'
+          : 'AI will automatically detect and categorize your photo'}
+      </p>
 
       <form onSubmit={handleUpload} className="space-y-4">
-        {/* File input */}
+        {/* Camera/File input - optimized for mobile */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Select Image
-          </label>
           <input
             type="file"
             accept="image/*"
+            capture="environment"
             onChange={handleFileSelect}
-            className="block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-md file:border-0
-              file:text-sm file:font-semibold
-              file:bg-green-50 file:text-green-700
-              hover:file:bg-green-100"
+            className="hidden"
+            id="photo-input"
           />
+          <label
+            htmlFor="photo-input"
+            className="flex items-center justify-center gap-3 w-full bg-green-600 text-white py-4 px-6 rounded-lg
+              hover:bg-green-700 active:bg-green-800 cursor-pointer font-medium text-lg
+              transition-colors shadow-md"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {selectedFile ? 'Change Photo' : 'Take or Upload Photo'}
+          </label>
         </div>
 
         {/* Preview */}
         {preview && (
-          <div className="mt-4">
+          <div className="relative">
             <img
               src={preview}
               alt="Preview"
-              className="max-w-full h-auto max-h-64 rounded-lg"
+              className="w-full h-auto rounded-lg shadow-md"
             />
+            <div className="mt-2 text-sm text-gray-600 text-center">
+              ✨ AI will analyze this photo automatically
+            </div>
           </div>
         )}
-
-        {/* Category select (for admins) */}
-        {showCategorySelect && (
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Category
-            </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="">Auto-detect with AI</option>
-              <option value="stand">Flower Stand</option>
-              <option value="bouquet">Bouquet</option>
-              <option value="flower_type">Flower Type</option>
-              <option value="garden_row">Garden Row</option>
-            </select>
-          </div>
-        )}
-
-        {/* Flower catalog fields */}
-        {showFlowerFields && (
-          <>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Flower Name
-              </label>
-              <input
-                type="text"
-                value={flowerName}
-                onChange={(e) => setFlowerName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="e.g., Sunflower"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Wikipedia URL
-              </label>
-              <input
-                type="url"
-                value={wikipediaUrl}
-                onChange={(e) => setWikipediaUrl(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="https://en.wikipedia.org/wiki/..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Harvest Season
-              </label>
-              <input
-                type="text"
-                value={harvestSeason}
-                onChange={(e) => setHarvestSeason(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="e.g., Spring, Summer"
-              />
-            </div>
-          </>
-        )}
-
-        {/* Row number (for garden rows) */}
-        {selectedCategory === 'garden_row' && (
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Row Number
-            </label>
-            <input
-              type="number"
-              value={rowNumber}
-              onChange={(e) => setRowNumber(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              min="1"
-            />
-          </div>
-        )}
-
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Description (optional)
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            rows={3}
-            placeholder="Add a description..."
-          />
-        </div>
 
         {/* Error message */}
         {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
-            {error}
+          <div className="bg-red-50 text-red-700 p-4 rounded-lg text-sm flex items-start gap-2">
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <span>{error}</span>
           </div>
         )}
 
         {/* Submit button */}
-        <button
-          type="submit"
-          disabled={!selectedFile || uploading}
-          className="w-full bg-green-600 text-white py-2 px-4 rounded-md
-            hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed
-            font-medium transition-colors"
-        >
-          {uploading ? 'Uploading...' : 'Upload Photo'}
-        </button>
+        {selectedFile && (
+          <button
+            type="submit"
+            disabled={uploading}
+            className="w-full bg-accent text-white py-4 px-6 rounded-lg
+              hover:bg-accent/90 disabled:bg-gray-300 disabled:cursor-not-allowed
+              font-medium text-lg transition-colors shadow-md flex items-center justify-center gap-2"
+          >
+            {uploading ? (
+              <>
+                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Uploading & Analyzing...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Upload Photo
+              </>
+            )}
+          </button>
+        )}
       </form>
     </div>
   );
