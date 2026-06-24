@@ -692,20 +692,59 @@ func extractFullEXIF(data []byte) map[string]interface{} {
 		return result
 	}
 
-	// Walk all EXIF fields
-	walker := func(name exif.FieldName, tag *exif.Tag) error {
-		// Convert tag value to string for JSON storage
+	// Extract common EXIF fields manually instead of using Walk
+	// to avoid type compatibility issues
+	if tag, err := x.Get(exif.Make); err == nil {
 		if val, err := tag.StringVal(); err == nil {
-			result[string(name)] = val
-		} else if val, err := tag.Int(0); err == nil {
-			result[string(name)] = val
-		} else if val, err := tag.Rat(0); err == nil {
-			f, _ := val.Float64()
-			result[string(name)] = f
+			result["Make"] = val
 		}
-		return nil
 	}
-	_ = x.Walk(walker)
+	if tag, err := x.Get(exif.Model); err == nil {
+		if val, err := tag.StringVal(); err == nil {
+			result["Model"] = val
+		}
+	}
+	if tag, err := x.Get(exif.DateTime); err == nil {
+		if val, err := tag.StringVal(); err == nil {
+			result["DateTime"] = val
+		}
+	}
+	if tag, err := x.Get(exif.DateTimeOriginal); err == nil {
+		if val, err := tag.StringVal(); err == nil {
+			result["DateTimeOriginal"] = val
+		}
+	}
+	if tag, err := x.Get(exif.ExposureTime); err == nil {
+		if val, err := tag.Rat(0); err == nil {
+			if f, _ := val.Float64(); f > 0 {
+				result["ExposureTime"] = f
+			}
+		}
+	}
+	if tag, err := x.Get(exif.FNumber); err == nil {
+		if val, err := tag.Rat(0); err == nil {
+			if f, _ := val.Float64(); f > 0 {
+				result["FNumber"] = f
+			}
+		}
+	}
+	if tag, err := x.Get(exif.ISOSpeedRatings); err == nil {
+		if val, err := tag.Int(0); err == nil {
+			result["ISO"] = val
+		}
+	}
+	if tag, err := x.Get(exif.FocalLength); err == nil {
+		if val, err := tag.Rat(0); err == nil {
+			if f, _ := val.Float64(); f > 0 {
+				result["FocalLength"] = f
+			}
+		}
+	}
+	if tag, err := x.Get(exif.LensModel); err == nil {
+		if val, err := tag.StringVal(); err == nil {
+			result["LensModel"] = val
+		}
+	}
 
 	return result
 }
