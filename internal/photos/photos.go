@@ -693,7 +693,7 @@ func extractFullEXIF(data []byte) map[string]interface{} {
 	}
 
 	// Walk all EXIF fields
-	x.Walk(func(name exif.FieldName, tag *exif.Tag) error {
+	_ = x.Walk(func(name exif.FieldName, tag *exif.Tag) error {
 		// Convert tag value to string for JSON storage
 		if val, err := tag.StringVal(); err == nil {
 			result[string(name)] = val
