@@ -25,7 +25,7 @@ interface Photo {
 }
 
 export default function AdminPhotos() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'published' | 'reviews'>('all');
