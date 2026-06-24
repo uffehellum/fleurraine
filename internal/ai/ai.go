@@ -51,14 +51,22 @@ func AnalyzeImage(ctx context.Context, req AnalyzeImageRequest) (*AnalyzeImageRe
 	// Default prompt if none provided
 	prompt := req.Prompt
 	if prompt == "" {
-		prompt = `Analyze this image and provide a JSON response with the following fields:
-- category: one of "stand" (flower stand/display), "bouquet" (arranged flowers), "flower_type" (individual flower species), "garden_row" (flowers growing in rows), "review" (customer photo of flowers at home), or "other"
+		prompt = `You are analyzing photos for Fleurraine, a local flower farm that sells fresh-cut flowers from a roadside stand.
+
+Analyze this image and provide a JSON response with the following fields:
+- category: one of "stand" (flower stand/display with buckets of cut flowers), "bouquet" (arranged cut flowers in a vase or wrap), "flower_type" (close-up of individual flower species for catalog), "garden_row" (flowers growing in organized garden beds/rows), or "other"
 - description: a brief description of what's in the image (1-2 sentences)
 - confidence: your confidence in the category (0.0 to 1.0)
-- subjects: array of detected subjects (flower types, objects, people, etc.)
+- subjects: array of detected subjects (specific flower types like "sunflower", "dahlia", "zinnia", "rose", etc.)
 - location: detected location type ("flower_stand", "garden", "indoor", "outdoor", "unknown")
 
-Focus on identifying flowers, their arrangement, and the setting. For flower stands, look for displays with multiple flower types. For bouquets, look for arranged cut flowers. For garden rows, look for flowers growing in organized rows or beds.
+CATEGORY IDENTIFICATION GUIDE:
+- "stand": Look for buckets/containers with multiple cut flower varieties displayed together, typically outdoors at a roadside stand
+- "bouquet": Arranged cut flowers in a vase, wrap, or hand-held arrangement
+- "flower_type": Close-up photo of a single flower species, suitable for a flower catalog
+- "garden_row": Flowers growing in organized rows or beds in a garden setting
+
+Be specific with flower types in the subjects array. Common Fleurraine flowers include: sunflowers, dahlias, zinnias, cosmos, celosia, snapdragons, marigolds, asters, and various seasonal blooms.
 
 Respond ONLY with valid JSON, no additional text.`
 	}
@@ -147,13 +155,29 @@ Respond ONLY with valid JSON, no additional text.`
 	return &result, nil
 }
 
-// VerifyFlowerImage checks if an image actually contains flowers.
+// VerifyFlowerImage checks if an image actually contains flowers from Fleurraine.
 // This is used for consumer review verification to ensure submitted images
-// are relevant to the flower stand.
+// are relevant photos of Fleurraine flowers (not random images).
 func VerifyFlowerImage(ctx context.Context, imageData []byte, mimeType string) (bool, string, error) {
-	prompt := `Analyze this image and determine if it contains flowers or floral arrangements.
+	prompt := `You are verifying customer review photos for Fleurraine, a local flower farm.
+
+Analyze this image and determine if it shows fresh-cut flowers that could plausibly be from Fleurraine's flower stand.
+
+ACCEPT if the image shows:
+- Fresh cut flowers in a vase, bouquet, or arrangement
+- Flowers that appear to be recently purchased (not wilted or dying)
+- Common garden flowers like sunflowers, dahlias, zinnias, cosmos, etc.
+- Flowers displayed in a home setting
+
+REJECT if the image shows:
+- No flowers at all
+- Artificial/fake flowers
+- Flowers that are clearly not from a local farm (e.g., tropical flowers, roses from a florist)
+- Unrelated content (food, pets, landscapes without flowers, etc.)
+- Severely wilted or dead flowers
+
 Respond with a JSON object containing:
-- contains_flowers: boolean (true if flowers are present, false otherwise)
+- contains_flowers: boolean (true if this appears to be a valid Fleurraine flower photo, false otherwise)
 - reason: string (brief explanation of your determination)
 
 Respond ONLY with valid JSON, no additional text.`
