@@ -17,6 +17,7 @@ import Subscribe from "./pages/Subscribe";
 import AdminQueue from "./pages/AdminQueue";
 import AdminOrders from "./pages/AdminOrders";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminPhotos from "./pages/AdminPhotos";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
 
@@ -74,6 +75,14 @@ export default function App() {
               element={
                 <AdminRoute>
                   <AdminAnalytics />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/photos"
+              element={
+                <AdminRoute>
+                  <AdminPhotos />
                 </AdminRoute>
               }
             />

@@ -18,6 +18,8 @@ import (
 
 	"github.com/uffehellum/fleurraine/internal/auth"
 	"github.com/uffehellum/fleurraine/internal/db"
+	"github.com/uffehellum/fleurraine/internal/photos"
+	"github.com/uffehellum/fleurraine/internal/storage"
 )
 
 // static holds the compiled React frontend.
@@ -63,6 +65,18 @@ func main() {
 
 	authSvc := auth.NewWithDB(pool)
 
+	// Initialize storage client
+	storageClient, err := storage.New()
+	if err != nil {
+		pool.Close()
+		log.Fatalf("storage initialization failed: %v", err)
+	}
+
+	// Initialize photo service
+	photoSvc := photos.NewService(pool, storageClient)
+	photoHandlers := photos.NewHandlers(photoSvc)
+	storageHandler := photos.NewStorageHandler(storageClient)
+
 	r := chi.NewRouter()
 
 	// ── Global middleware ────────────────────────────────────────────────────
@@ -86,6 +100,31 @@ func main() {
 		r.Get("/session", authSvc.HandleSession)
 		r.Post("/signout", authSvc.HandleSignOut)
 	})
+
+	// ── Photo routes ─────────────────────────────────────────────────────────
+	r.Route("/api/photos", func(r chi.Router) {
+		// Public routes
+		r.Get("/latest-stand", photoHandlers.HandleGetLatestStand)
+		r.Get("/share/{token}", photoHandlers.HandleGetByShareToken)
+		r.Get("/", photoHandlers.HandleList)
+		r.Get("/{id}", photoHandlers.HandleGetByID)
+
+		// Protected routes (require authentication)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAuth)
+			r.Post("/upload", photoHandlers.HandleUpload)
+		})
+
+		// Admin-only routes
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAdmin)
+			r.Post("/{id}/publish", photoHandlers.HandlePublish)
+			r.Post("/{id}/approve-review", photoHandlers.HandleApproveReview)
+		})
+	})
+
+	// ── Storage proxy route (for serving images) ─────────────────────────────
+	r.Get("/api/storage/*", storageHandler.HandleGetImage)
 
 	// ── Placeholder for future API routes ────────────────────────────────────
 	r.Route("/api", func(r chi.Router) {
