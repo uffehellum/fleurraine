@@ -180,7 +180,7 @@ export default function Layout() {
         <p>Payment is made via Venmo after you receive your bouquet.</p>
         <p className="mt-1">
           Venmo:{" "}
-          <span className="font-medium text-text">@Lorraine-Fleurraine</span>
+          <span className="font-medium text-text">@LorraineSHellum</span>
         </p>
       </footer>
     </div>

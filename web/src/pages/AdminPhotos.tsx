@@ -60,12 +60,19 @@ export default function AdminPhotos() {
 
       let data = await response.json();
       
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error('API response is not an array:', data);
+        setPhotos([]);
+        return;
+      }
+      
       // Filter reviews if needed
       if (filter === 'reviews') {
         data = data.filter((p: Photo) => p.is_review);
       }
 
-      setPhotos(data);
+      setPhotos(data || []);
     } catch (err) {
       console.error('Failed to fetch photos:', err);
     } finally {

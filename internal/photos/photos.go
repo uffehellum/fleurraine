@@ -624,7 +624,7 @@ func (s *Service) ListPhotos(ctx context.Context, category, status string, limit
 	}
 	defer rows.Close()
 
-	var photos []*Photo
+	photos := make([]*Photo, 0)
 	for rows.Next() {
 		var p Photo
 		err := rows.Scan(
@@ -636,7 +636,10 @@ func (s *Service) ListPhotos(ctx context.Context, category, status string, limit
 		}
 		photos = append(photos, &p)
 	}
-	return photos, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return photos, nil
 }
 
 // PublishPhoto marks a photo as published.
