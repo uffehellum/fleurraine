@@ -8,6 +8,7 @@ web/.env.local
 /fleurraine
 /cmd/server/fleurraine
 /server
+# vendor/  # Uncomment to ignore vendored dependencies
 
 # Frontend build output
 web/dist/
