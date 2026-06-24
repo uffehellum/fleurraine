@@ -206,7 +206,7 @@ export default function AdminPhotos() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {photos.map((photo) => (
+          {photos?.map((photo) => (
             <div key={photo.id} className="space-y-3">
               <PhotoDisplay photo={photo} showDetails={true} />
               

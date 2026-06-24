@@ -105,7 +105,7 @@ export default function PhotoDisplay({ photo, showDetails = false, onShare }: Ph
 
           {photo.ai_analysis?.subjects && Array.isArray(photo.ai_analysis.subjects) && photo.ai_analysis.subjects.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {photo.ai_analysis.subjects.map((subject, idx) => (
+              {photo.ai_analysis.subjects?.map((subject, idx) => (
                 <span
                   key={idx}
                   className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded"

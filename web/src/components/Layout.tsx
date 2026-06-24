@@ -53,7 +53,7 @@ export default function Layout() {
 
             {/* Desktop navigation - icon only with hover labels */}
             <nav className="hidden md:flex items-center gap-x-1 text-sm">
-              {publicLinks.map(({ to, label, icon }) => (
+              {publicLinks?.map(({ to, label, icon }) => (
                 <Link
                   key={to}
                   to={to}
@@ -67,7 +67,7 @@ export default function Layout() {
                 </Link>
               ))}
               {isAdmin &&
-                adminLinks.map(({ to, label, icon }) => (
+                adminLinks?.map(({ to, label, icon }) => (
                   <Link
                     key={to}
                     to={to}
@@ -114,7 +114,7 @@ export default function Layout() {
           {menuOpen && (
             <div className="md:hidden mt-4 pb-4 border-t border-text/10 pt-4">
               <nav className="flex flex-col gap-2">
-                {publicLinks.map(({ to, label, icon }) => (
+                {publicLinks?.map(({ to, label, icon }) => (
                   <Link
                     key={to}
                     to={to}
@@ -126,7 +126,7 @@ export default function Layout() {
                   </Link>
                 ))}
                 {isAdmin &&
-                  adminLinks.map(({ to, label, icon }) => (
+                  adminLinks?.map(({ to, label, icon }) => (
                     <Link
                       key={to}
                       to={to}
