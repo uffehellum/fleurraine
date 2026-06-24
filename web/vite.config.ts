@@ -44,6 +44,8 @@ export default defineConfig({
             handler: "NetworkOnly",
           },
         ],
+        // Don't intercept OAuth redirects - let them pass through
+        navigateFallbackDenylist: [/^\/auth\/callback/],
       },
     }),
   ],

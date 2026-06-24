@@ -115,14 +115,14 @@ If you see errors like:
 
 **Backend (.env):**
 ```bash
-GOOGLE_CLIENT_ID=887157645579-dlejf1lmo9o8rptfog5j5tknogfjrpme.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
-ADMIN_EMAILS=uffe.hellum@gmail.com,lorraine.hellum@gmail.com
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+ADMIN_EMAILS=your-email@example.com
 ```
 
 **Frontend (web/.env.local):**
 ```bash
-VITE_GOOGLE_CLIENT_ID=887157645579-dlejf1lmo9o8rptfog5j5tknogfjrpme.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
 
 ### Step 7: Test the OAuth Flow

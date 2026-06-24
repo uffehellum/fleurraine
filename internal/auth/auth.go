@@ -251,6 +251,9 @@ func exchangeGoogleCode(ctx context.Context, code, redirectURI string) (googleID
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	// Always log the response for debugging
+	fmt.Fprintf(os.Stderr, "Google OAuth token exchange: status=%d, body=%s, redirectURI=%s, clientID=%s\n",
+		resp.StatusCode, body, redirectURI, clientID)
 	if resp.StatusCode != http.StatusOK {
 		return googleIDTokenPayload{}, fmt.Errorf("google: token endpoint returned %d: %s", resp.StatusCode, body)
 	}
@@ -303,12 +306,15 @@ func (s *Service) HandleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		RedirectURI string `json:"redirectUri"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" {
+		fmt.Fprintf(os.Stderr, "HandleGoogleAuth: decode error or missing code: %v\n", err)
 		writeError(w, http.StatusBadRequest, "code is required")
 		return
 	}
 
+	fmt.Fprintf(os.Stderr, "HandleGoogleAuth: calling exchangeGoogleCode with redirectURI=%s\n", req.RedirectURI)
 	info, err := exchangeGoogleCode(r.Context(), req.Code, req.RedirectURI)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "HandleGoogleAuth: exchangeGoogleCode failed: %v\n", err)
 		writeError(w, http.StatusUnauthorized, "google authentication failed")
 		return
 	}

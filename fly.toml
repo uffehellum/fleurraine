@@ -3,6 +3,9 @@ primary_region = "sjc"
 
 [build]
   dockerfile = "Dockerfile"
+  [build.args]
+    VITE_GOOGLE_CLIENT_ID = "887157645579-dlejf1lmo9o8rptfog5j5tknogfjrpme.apps.googleusercontent.com"
+    VITE_FACEBOOK_APP_ID = "1991765358879033"
 
 [http_service]
   internal_port = 8080

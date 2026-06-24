@@ -35,6 +35,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/fleurraine ./cmd/
 # ── Stage 3: Minimal runtime image ────────────────────────────────────────────
 FROM debian:bookworm-slim AS runtime
 
+# Install CA certificates for HTTPS requests
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system app && adduser --system --ingroup app app
 
 WORKDIR /app
