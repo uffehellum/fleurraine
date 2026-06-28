@@ -1,6 +1,7 @@
 import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useState } from "react";
+import PullToRefresh from "./PullToRefresh";
 
 const publicLinks = [
   { to: "/", label: "Home", icon: "🏠" },
@@ -24,8 +25,9 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-text/10 bg-bg">
+    <PullToRefresh>
+      <div className="flex min-h-screen flex-col">
+        <header className="border-b border-text/10 bg-bg">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center justify-between">
             <Link
@@ -180,9 +182,22 @@ export default function Layout() {
         <p>Payment is made via Venmo after you receive your bouquet.</p>
         <p className="mt-1">
           Venmo:{" "}
-          <span className="font-medium text-text">@LorraineSHellum</span>
+          <a
+            href={`venmo://paycharge?txn=pay&recipients=${import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum'}`}
+            className="font-medium text-accent hover:underline"
+            onClick={() => {
+              // Fallback to web if app doesn't open
+              const venmoUsername = import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum';
+              setTimeout(() => {
+                window.open(`https://venmo.com/${venmoUsername}`, '_blank');
+              }, 1000);
+            }}
+          >
+            @{import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum'}
+          </a>
         </p>
       </footer>
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

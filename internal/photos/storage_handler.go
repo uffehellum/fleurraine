@@ -2,6 +2,7 @@
 package photos
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"strings"
@@ -36,8 +37,8 @@ func (h *StorageHandler) HandleGetImage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Fetch from storage
-	body, err := h.storage.Get(r.Context(), key)
+	// Fetch from storage (now returns []byte)
+	data, err := h.storage.Get(r.Context(), key)
 	if err != nil {
 		// Check if it's a 404
 		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "NotFound") {
@@ -47,7 +48,6 @@ func (h *StorageHandler) HandleGetImage(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "failed to fetch image", http.StatusInternalServerError)
 		return
 	}
-	defer body.Close()
 
 	// Determine content type from key extension
 	contentType := "application/octet-stream"
@@ -66,7 +66,7 @@ func (h *StorageHandler) HandleGetImage(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 
 	// Stream the image to the response
-	if _, err := io.Copy(w, body); err != nil {
+	if _, err := io.Copy(w, bytes.NewReader(data)); err != nil {
 		// Can't send error response here as headers are already sent
 		return
 	}

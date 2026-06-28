@@ -1,0 +1,170 @@
+// Package ai provides species identification for flower photos.
+package ai
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+// SpeciesIdentificationRequest holds parameters for identifying flower species.
+type SpeciesIdentificationRequest struct {
+	// ImageData is the raw image bytes (JPEG, PNG, WebP, or GIF).
+	ImageData []byte
+	// MimeType is the MIME type of the image (e.g., "image/jpeg").
+	MimeType string
+}
+
+// SpeciesIdentificationResponse holds the AI's identification of flower species.
+type SpeciesIdentificationResponse struct {
+	// SpeciesName is the common name of the flower species (e.g., "Sunflower", "Dahlia").
+	SpeciesName string `json:"species_name"`
+	// ScientificName is the scientific/botanical name (e.g., "Helianthus annuus").
+	ScientificName string `json:"scientific_name"`
+	// WikipediaURL is a direct link to the Wikipedia article for this species.
+	WikipediaURL string `json:"wikipedia_url"`
+	// SeasonDescription describes when this flower blooms in the Camano Island area.
+	SeasonDescription string `json:"season_description"`
+	// Confidence is the AI's confidence in the identification (0.0 to 1.0).
+	Confidence float64 `json:"confidence"`
+	// IsSingleFlower indicates if the image shows a single flower species suitable for catalog.
+	IsSingleFlower bool `json:"is_single_flower"`
+}
+
+// IdentifyFlowerSpecies uses Claude Vision API to identify a flower species
+// and provide Wikipedia link and seasonal information for the Camano Island area.
+func IdentifyFlowerSpecies(ctx context.Context, req SpeciesIdentificationRequest) (*SpeciesIdentificationResponse, error) {
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("ai: ANTHROPIC_API_KEY is required")
+	}
+
+	prompt := `You are a botanical expert helping identify flowers for Fleurraine, a flower farm on Camano Island, Washington (Pacific Northwest, USDA Zone 8b).
+
+Analyze this image and determine if it shows a single flower species suitable for a flower catalog entry.
+
+If this is a clear photo of a single flower species (not a mixed bouquet or garden scene), provide:
+
+1. species_name: The common name of the flower (e.g., "Sunflower", "Dahlia", "Zinnia")
+2. scientific_name: The botanical/scientific name (e.g., "Helianthus annuus")
+3. wikipedia_url: The direct Wikipedia URL for this species (e.g., "https://en.wikipedia.org/wiki/Helianthus_annuus")
+4. season_description: A brief description (1-2 sentences) of when this flower typically blooms in the Camano Island/Pacific Northwest area (Zone 8b). Include months and any relevant growing information.
+5. confidence: Your confidence in this identification (0.0 to 1.0)
+6. is_single_flower: true if this is a single species suitable for catalog, false if it's a mixed arrangement or unclear
+
+Common Fleurraine flowers include:
+- Sunflowers (Helianthus annuus) - Summer to fall, July-October
+- Dahlias (Dahlia spp.) - Summer to fall, July-October, frost-sensitive
+- Zinnias (Zinnia elegans) - Summer to fall, June-October
+- Cosmos (Cosmos bipinnatus) - Summer to fall, July-October
+- Celosia (Celosia argentea) - Summer to fall, July-September
+- Snapdragons (Antirrhinum majus) - Spring and fall, April-June, September-October
+- Marigolds (Tagetes spp.) - Summer to fall, June-October
+- Asters (Aster spp.) - Late summer to fall, August-October
+
+For the season_description, be specific to the Pacific Northwest climate. Consider:
+- Cool, wet winters and mild, dry summers
+- Last frost typically late April, first frost late October
+- Peak growing season June-September
+
+Respond ONLY with valid JSON, no additional text.
+
+Example response:
+{
+  "species_name": "Sunflower",
+  "scientific_name": "Helianthus annuus",
+  "wikipedia_url": "https://en.wikipedia.org/wiki/Helianthus_annuus",
+  "season_description": "Sunflowers bloom from July through October in the Camano area, thriving in the warm, dry summer months. They are frost-sensitive and should be planted after the last frost in late April.",
+  "confidence": 0.95,
+  "is_single_flower": true
+}`
+
+	// Encode image to base64
+	base64Image := base64.StdEncoding.EncodeToString(req.ImageData)
+
+	// Build the Anthropic API request
+	// Using Claude 3 Opus - older but more stable, works with most API keys
+	anthropicReq := map[string]interface{}{
+		"model":      "claude-3-opus-20240229",
+		"max_tokens": 1024,
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": []map[string]interface{}{
+					{
+						"type": "image",
+						"source": map[string]string{
+							"type":       "base64",
+							"media_type": req.MimeType,
+							"data":       base64Image,
+						},
+					},
+					{
+						"type": "text",
+						"text": prompt,
+					},
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(anthropicReq)
+	if err != nil {
+		return nil, fmt.Errorf("ai: marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicAPIURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("ai: create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", apiKey)
+	httpReq.Header.Set("anthropic-version", anthropicVersion)
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("ai: http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("ai: read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ai: API returned %d: %s", resp.StatusCode, respBody)
+	}
+
+	// Parse Anthropic response
+	var anthropicResp struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(respBody, &anthropicResp); err != nil {
+		return nil, fmt.Errorf("ai: unmarshal response: %w", err)
+	}
+
+	if len(anthropicResp.Content) == 0 {
+		return nil, fmt.Errorf("ai: empty response from API")
+	}
+
+	// Extract the text content (should be JSON)
+	textContent := anthropicResp.Content[0].Text
+
+	// Parse the AI's JSON response
+	var result SpeciesIdentificationResponse
+	if err := json.Unmarshal([]byte(textContent), &result); err != nil {
+		return nil, fmt.Errorf("ai: parse AI response JSON: %w (response: %s)", err, textContent)
+	}
+
+	return &result, nil
+}

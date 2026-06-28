@@ -11,6 +11,7 @@ import FlowerDetail from "./pages/FlowerDetail";
 import Garden from "./pages/Garden";
 import GardenRow from "./pages/GardenRow";
 import Bouquets from "./pages/Bouquets";
+import BouquetDetail from "./pages/BouquetDetail";
 import Season from "./pages/Season";
 import Orders from "./pages/Orders";
 import Subscribe from "./pages/Subscribe";
@@ -18,6 +19,7 @@ import AdminQueue from "./pages/AdminQueue";
 import AdminOrders from "./pages/AdminOrders";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPhotos from "./pages/AdminPhotos";
+import PhotoDetail from "./pages/PhotoDetail";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
 
@@ -36,6 +38,7 @@ export default function App() {
             <Route path="/garden" element={<Garden />} />
             <Route path="/garden/:row" element={<GardenRow />} />
             <Route path="/bouquets" element={<Bouquets />} />
+            <Route path="/bouquets/:id" element={<BouquetDetail />} />
             <Route path="/season" element={<Season />} />
             <Route path="/sign-in" element={<SignIn />} />
             <Route
@@ -85,6 +88,18 @@ export default function App() {
                   <AdminPhotos />
                 </AdminRoute>
               }
+            />
+            <Route
+              path="/admin/photos/:id"
+              element={
+                <AdminRoute>
+                  <PhotoDetail />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/photos/:id"
+              element={<PhotoDetail />}
             />
           </Route>
         </Routes>

@@ -120,11 +120,43 @@ func main() {
 			r.Use(auth.RequireAdmin)
 			r.Post("/{id}/publish", photoHandlers.HandlePublish)
 			r.Post("/{id}/approve-review", photoHandlers.HandleApproveReview)
+			r.Post("/{id}/reanalyze", photoHandlers.HandleReanalyze)
+			r.Delete("/{id}", photoHandlers.HandleDelete)
+			r.Put("/{id}/edits", photoHandlers.HandleUpdateEdits)
+			r.Put("/{id}/category", photoHandlers.HandleUpdateCategory)
 		})
+	})
+
+	// ── Bouquet routes (numbered bouquets for sale) ──────────────────────────
+	r.Route("/api/bouquets", func(r chi.Router) {
+		// Public routes
+		r.Get("/available", photoHandlers.HandleGetAvailableBouquets)
 	})
 
 	// ── Storage proxy route (for serving images) ─────────────────────────────
 	r.Get("/api/storage/*", storageHandler.HandleGetImage)
+
+	// ── User management routes ───────────────────────────────────────────────
+	r.Route("/api/user", func(r chi.Router) {
+		r.Use(auth.RequireAuth)
+		r.Get("/profile", authSvc.HandleGetProfile)
+		r.Put("/email-opt-out", authSvc.HandleUpdateEmailOptOut)
+		r.Delete("/account", authSvc.HandleDeleteAccount)
+	})
+
+	// ── Admin user management routes ─────────────────────────────────────────
+	r.Route("/api/admin/users", func(r chi.Router) {
+		r.Use(auth.RequireAdmin)
+		r.Get("/", authSvc.HandleListUsers)
+		r.Post("/{id}/block", authSvc.HandleBlockUser)
+		r.Post("/{id}/unblock", authSvc.HandleUnblockUser)
+		r.Get("/{id}/audit-log", authSvc.HandleGetAuditLog)
+	})
+
+	r.Route("/api/admin/settings", func(r chi.Router) {
+		r.Use(auth.RequireAdmin)
+		r.Put("/registration-limit", authSvc.HandleUpdateRegistrationLimit)
+	})
 
 	// ── Placeholder for future API routes ────────────────────────────────────
 	r.Route("/api", func(r chi.Router) {

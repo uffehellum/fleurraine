@@ -151,10 +151,10 @@ func IsDuplicate(ctx context.Context, pool *pgxpool.Pool, hash string) (bool, er
 		return false, fmt.Errorf("photos: IsDuplicate parse hash: %w", err)
 	}
 
-	// Fetch all non-null perceptual hashes from the DB. For Lorraine's use
-	// case the photo count is small enough that a full scan is fine.
+	// Fetch all non-null perceptual hashes from the DB, excluding deleted photos.
+	// For Lorraine's use case the photo count is small enough that a full scan is fine.
 	rows, err := pool.Query(ctx,
-		`SELECT perceptual_hash FROM photos WHERE perceptual_hash IS NOT NULL`)
+		`SELECT perceptual_hash FROM photos WHERE perceptual_hash IS NOT NULL AND deleted_at IS NULL`)
 	if err != nil {
 		return false, fmt.Errorf("photos: IsDuplicate query: %w", err)
 	}
@@ -241,6 +241,8 @@ type Photo struct {
 	Description      *string                `json:"description,omitempty"`
 	FreshnessDays    *int16                 `json:"freshness_days,omitempty"`
 	UploadedBy       string                 `json:"uploaded_by"`
+	UploadedByEmail  *string                `json:"uploaded_by_email,omitempty"`
+	UploadedByName   *string                `json:"uploaded_by_name,omitempty"`
 	UploadedAt       time.Time              `json:"uploaded_at"`
 	PublishedAt      *time.Time             `json:"published_at,omitempty"`
 	IsReview         bool                   `json:"is_review"`
@@ -250,6 +252,14 @@ type Photo struct {
 	ReviewedAt       *time.Time             `json:"reviewed_at,omitempty"`
 	WikipediaURL     *string                `json:"wikipedia_url,omitempty"`
 	ShareToken       *string                `json:"share_token,omitempty"`
+	PhotoEdits       map[string]interface{} `json:"photo_edits,omitempty"`
+	DetectedLocation *string                `json:"detected_location,omitempty"`
+	BouquetNumber    *int                   `json:"bouquet_number,omitempty"`
+	PriceCents       *int                   `json:"price_cents,omitempty"`
+	DetectedFlowers  []string               `json:"detected_flowers,omitempty"`
+	PurchasedBy      *string                `json:"purchased_by,omitempty"`
+	SoldAt           *time.Time             `json:"sold_at,omitempty"`
+	ReplacedPhotoID  *string                `json:"replaced_photo_id,omitempty"`
 }
 
 // UploadRequest contains all parameters for uploading a photo.
@@ -287,13 +297,13 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		return nil, fmt.Errorf("photos: invalid file type: %s", mimeType)
 	}
 
-	// Decode image
+	// Decode image and auto-orient based on EXIF
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("photos: decode image: %w", err)
 	}
 
-	// Extract EXIF metadata
+	// Extract EXIF metadata BEFORE auto-orient (need orientation tag)
 	exifData, err := ExtractEXIF(data)
 	if err != nil {
 		return nil, fmt.Errorf("photos: extract EXIF: %w", err)
@@ -308,7 +318,37 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		cameraModel = &model
 	}
 
-	// Generate renditions
+	// Auto-orient image based on EXIF orientation tag
+	// This ensures thumbnails are generated with correct orientation
+	img = autoOrientImage(img, getImageOrientation(exifMetadata))
+
+	// Convert EXIF timestamp from Pacific time to UTC for storage
+	// Only assume Pacific time for iPhone cameras
+	if exifData.TakenAt != nil {
+		isIPhone := cameraModel != nil && strings.Contains(strings.ToLower(*cameraModel), "iphone")
+		if isIPhone {
+			// Assume EXIF timestamp is in Pacific time (America/Los_Angeles)
+			loc, err := time.LoadLocation("America/Los_Angeles")
+			if err == nil {
+				// Parse as Pacific time and convert to UTC
+				pacificTime := time.Date(
+					exifData.TakenAt.Year(),
+					exifData.TakenAt.Month(),
+					exifData.TakenAt.Day(),
+					exifData.TakenAt.Hour(),
+					exifData.TakenAt.Minute(),
+					exifData.TakenAt.Second(),
+					exifData.TakenAt.Nanosecond(),
+					loc,
+				)
+				utcTime := pacificTime.UTC()
+				exifData.TakenAt = &utcTime
+			}
+		}
+		// For non-iPhone cameras, keep the timestamp as-is (camera's local time)
+	}
+
+	// Generate renditions (now from properly oriented image)
 	renditions, err := GenerateRenditions(img)
 	if err != nil {
 		return nil, fmt.Errorf("photos: generate renditions: %w", err)
@@ -329,7 +369,7 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		return nil, fmt.Errorf("photos: duplicate image detected")
 	}
 
-	// AI analysis
+	// AI analysis with enhanced bouquet detection
 	aiResp, err := ai.AnalyzeImage(ctx, ai.AnalyzeImageRequest{
 		ImageData: data,
 		MimeType:  mimeType,
@@ -339,14 +379,46 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		fmt.Printf("photos: AI analysis failed: %v\n", err)
 	}
 
+	// Handle numbered bouquet detection and photo replacement
+	var replacedPhotoID *string
+	var bouquetNumber *int
+	var priceCents *int
+	var detectedFlowers []string
+
+	if aiResp != nil {
+		// Store detected flowers
+		if len(aiResp.DetectedFlowers) > 0 {
+			detectedFlowers = aiResp.DetectedFlowers
+		}
+
+		// If AI detected a numbered bouquet, handle it
+		if aiResp.IsNumberedBouquet && aiResp.BouquetNumber != nil {
+			bouquetNumber = aiResp.BouquetNumber
+			defaultPrice := 2500 // Default $25.00
+			priceCents = &defaultPrice
+
+			// Check if this bouquet number already exists
+			existingPhoto, err := s.GetPhotoByBouquetNumber(ctx, *aiResp.BouquetNumber)
+			if err == nil && existingPhoto != nil {
+				// Replace the old photo with this new one
+				err = s.ReplacePhoto(ctx, existingPhoto.ID, "Replaced with better photo")
+				if err != nil {
+					fmt.Printf("photos: failed to replace photo: %v\n", err)
+				} else {
+					replacedPhotoID = &existingPhoto.ID
+				}
+			}
+		}
+	}
+
 	// For reviews, verify the image contains flowers
 	if req.IsReview {
-		containsFlowers, reason, err := ai.VerifyFlowerImage(ctx, data, mimeType)
+		containsFlowers, err := ai.VerifyFlowerImage(ctx, data)
 		if err != nil {
 			return nil, fmt.Errorf("photos: review verification failed: %w", err)
 		}
 		if !containsFlowers {
-			return nil, fmt.Errorf("photos: review image rejected: %s", reason)
+			return nil, fmt.Errorf("photos: review image rejected")
 		}
 	}
 
@@ -357,6 +429,30 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 	}
 	if category == "" {
 		category = "other"
+	}
+
+	// For single flower photos (flower_type category), identify species and get Wikipedia link
+	var speciesInfo *ai.SpeciesIdentificationResponse
+	if category == "flower_type" && !req.IsReview {
+		speciesInfo, err = ai.IdentifyFlowerSpecies(ctx, ai.SpeciesIdentificationRequest{
+			ImageData: data,
+			MimeType:  mimeType,
+		})
+		if err != nil {
+			// Log but don't fail on species identification error
+			fmt.Printf("photos: species identification failed: %v\n", err)
+		} else if speciesInfo != nil && speciesInfo.IsSingleFlower {
+			// Pre-fill flower name, Wikipedia URL, and season description
+			if req.FlowerName == "" && speciesInfo.SpeciesName != "" {
+				req.FlowerName = speciesInfo.SpeciesName
+			}
+			if req.WikipediaURL == "" && speciesInfo.WikipediaURL != "" {
+				req.WikipediaURL = speciesInfo.WikipediaURL
+			}
+			if req.HarvestSeason == "" && speciesInfo.SeasonDescription != "" {
+				req.HarvestSeason = speciesInfo.SeasonDescription
+			}
+		}
 	}
 
 	// Generate UUID for storage keys
@@ -387,6 +483,13 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		return nil, fmt.Errorf("photos: upload thumb: %w", err)
 	}
 
+	// Detect location from GPS coordinates
+	detectedLocation := DetectLocation(exifData.GPSLat, exifData.GPSLng)
+	var detectedLocationPtr *string
+	if detectedLocation != "" {
+		detectedLocationPtr = &detectedLocation
+	}
+
 	// Generate share token
 	shareToken, err := generateShareToken()
 	if err != nil {
@@ -400,8 +503,6 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 			"category":    aiResp.Category,
 			"description": aiResp.Description,
 			"confidence":  aiResp.Confidence,
-			"subjects":    aiResp.Subjects,
-			"location":    aiResp.Location,
 		}
 	}
 
@@ -427,14 +528,16 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 			perceptual_hash, ai_suggestion, ai_analysis,
 			flower_name, harvest_season, row_number, description,
 			uploaded_by, uploaded_at, published_at,
-			is_review, share_token, wikipedia_url
+			is_review, share_token, wikipedia_url, detected_location,
+			bouquet_number, price_cents, detected_flowers
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
 			$7, $8, $9, $10, $11,
 			$12, $13, $14,
 			$15, $16, $17, $18,
 			$19, now(), $20,
-			$21, $22, $23
+			$21, $22, $23, $24,
+			$25, $26, $27
 		)
 		RETURNING id, uploaded_at
 	`
@@ -460,7 +563,8 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		dhash, aiSuggestion, aiAnalysisJSON,
 		flowerName, harvestSeason, req.RowNumber, description,
 		req.UserID, publishedAt,
-		req.IsReview, shareToken, wikipediaURL,
+		req.IsReview, shareToken, wikipediaURL, detectedLocationPtr,
+		bouquetNumber, priceCents, detectedFlowers,
 	).Scan(&photoID, &uploadedAt)
 	if err != nil {
 		return nil, fmt.Errorf("photos: insert record: %w", err)
@@ -491,6 +595,11 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		IsReview:         req.IsReview,
 		ShareToken:       &shareToken,
 		WikipediaURL:     wikipediaURL,
+		DetectedLocation: detectedLocationPtr,
+		BouquetNumber:    bouquetNumber,
+		PriceCents:       priceCents,
+		DetectedFlowers:  detectedFlowers,
+		ReplacedPhotoID:  replacedPhotoID,
 	}, nil
 }
 
@@ -524,19 +633,21 @@ func (s *Service) GetLatestStandPhoto(ctx context.Context) (*Photo, error) {
 // GetPhotoByID retrieves a photo by its ID.
 func (s *Service) GetPhotoByID(ctx context.Context, id string) (*Photo, error) {
 	const query = `
-		SELECT id, category, status, storage_key_orig, storage_key_thumb, storage_key_mobile,
-		       exif_taken_at, exif_gps_lat, exif_gps_lng, exif_metadata, camera_model,
-		       perceptual_hash, ai_suggestion, ai_analysis,
-		       flower_name, harvest_season, row_number, description, freshness_days,
-		       uploaded_by, uploaded_at, published_at,
-		       is_review, review_verified, review_approved, reviewed_by, reviewed_at,
-		       wikipedia_url, share_token
-		FROM photos
-		WHERE id = $1
+		SELECT p.id, p.category, p.status, p.storage_key_orig, p.storage_key_thumb, p.storage_key_mobile,
+		       p.exif_taken_at, p.exif_gps_lat, p.exif_gps_lng, p.exif_metadata, p.camera_model,
+		       p.perceptual_hash, p.ai_suggestion, p.ai_analysis,
+		       p.flower_name, p.harvest_season, p.row_number, p.description, p.freshness_days,
+		       p.uploaded_by, p.uploaded_at, p.published_at,
+		       p.is_review, p.review_verified, p.review_approved, p.reviewed_by, p.reviewed_at,
+		       p.wikipedia_url, p.share_token, p.photo_edits, p.detected_location,
+		       u.email, u.display_name
+		FROM photos p
+		LEFT JOIN users u ON p.uploaded_by = u.id
+		WHERE p.id = $1
 	`
 
 	var p Photo
-	var exifMetadataJSON, aiAnalysisJSON []byte
+	var exifMetadataJSON, aiAnalysisJSON, photoEditsJSON []byte
 	err := s.db.QueryRow(ctx, query, id).Scan(
 		&p.ID, &p.Category, &p.Status, &p.StorageKeyOrig, &p.StorageKeyThumb, &p.StorageKeyMobile,
 		&p.EXIFTakenAt, &p.EXIFGPSLat, &p.EXIFGPSLng, &exifMetadataJSON, &p.CameraModel,
@@ -544,7 +655,8 @@ func (s *Service) GetPhotoByID(ctx context.Context, id string) (*Photo, error) {
 		&p.FlowerName, &p.HarvestSeason, &p.RowNumber, &p.Description, &p.FreshnessDays,
 		&p.UploadedBy, &p.UploadedAt, &p.PublishedAt,
 		&p.IsReview, &p.ReviewVerified, &p.ReviewApproved, &p.ReviewedBy, &p.ReviewedAt,
-		&p.WikipediaURL, &p.ShareToken,
+		&p.WikipediaURL, &p.ShareToken, &photoEditsJSON, &p.DetectedLocation,
+		&p.UploadedByEmail, &p.UploadedByName,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -559,6 +671,9 @@ func (s *Service) GetPhotoByID(ctx context.Context, id string) (*Photo, error) {
 	}
 	if len(aiAnalysisJSON) > 0 {
 		json.Unmarshal(aiAnalysisJSON, &p.AIAnalysis)
+	}
+	if len(photoEditsJSON) > 0 {
+		json.Unmarshal(photoEditsJSON, &p.PhotoEdits)
 	}
 
 	return &p, nil
@@ -592,27 +707,30 @@ func (s *Service) GetPhotoByShareToken(ctx context.Context, token string) (*Phot
 // ListPhotos returns photos filtered by category and status.
 func (s *Service) ListPhotos(ctx context.Context, category, status string, limit int) ([]*Photo, error) {
 	query := `
-		SELECT id, category, status, storage_key_thumb, storage_key_mobile, storage_key_orig,
-		       exif_taken_at, flower_name, description, uploaded_at, published_at, share_token,
-		       ai_analysis, is_review, review_approved, camera_model
-		FROM photos
+		SELECT p.id, p.category, p.status, p.storage_key_thumb, p.storage_key_mobile, p.storage_key_orig,
+		       p.exif_taken_at, p.flower_name, p.description, p.uploaded_at, p.published_at, p.share_token,
+		       p.ai_analysis, p.is_review, p.review_approved, p.camera_model, p.detected_location,
+		       p.exif_gps_lat, p.exif_gps_lng, p.uploaded_by,
+		       u.email, u.display_name
+		FROM photos p
+		LEFT JOIN users u ON p.uploaded_by = u.id
 		WHERE 1=1
 	`
 	args := []interface{}{}
 	argNum := 1
 
 	if category != "" {
-		query += fmt.Sprintf(" AND category = $%d", argNum)
+		query += fmt.Sprintf(" AND p.category = $%d", argNum)
 		args = append(args, category)
 		argNum++
 	}
 	if status != "" {
-		query += fmt.Sprintf(" AND status = $%d", argNum)
+		query += fmt.Sprintf(" AND p.status = $%d", argNum)
 		args = append(args, status)
 		argNum++
 	}
 
-	query += " ORDER BY COALESCE(exif_taken_at, uploaded_at) DESC"
+	query += " ORDER BY p.uploaded_at DESC"
 
 	if limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", argNum)
@@ -632,7 +750,9 @@ func (s *Service) ListPhotos(ctx context.Context, category, status string, limit
 		err := rows.Scan(
 			&p.ID, &p.Category, &p.Status, &p.StorageKeyThumb, &p.StorageKeyMobile, &p.StorageKeyOrig,
 			&p.EXIFTakenAt, &p.FlowerName, &p.Description, &p.UploadedAt, &p.PublishedAt, &p.ShareToken,
-			&aiAnalysisJSON, &p.IsReview, &p.ReviewApproved, &p.CameraModel,
+			&aiAnalysisJSON, &p.IsReview, &p.ReviewApproved, &p.CameraModel, &p.DetectedLocation,
+			&p.EXIFGPSLat, &p.EXIFGPSLng, &p.UploadedBy,
+			&p.UploadedByEmail, &p.UploadedByName,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("photos: scan row: %w", err)
@@ -671,6 +791,256 @@ func (s *Service) ApproveReview(ctx context.Context, photoID, reviewerID string,
 	`
 	_, err := s.db.Exec(ctx, query, approved, reviewerID, photoID)
 	return err
+}
+
+// DeletePhoto performs a soft delete: marks the photo as deleted in the database
+// and HARD deletes the physical files from storage for audit purposes.
+func (s *Service) DeletePhoto(ctx context.Context, id, deleterEmail string) error {
+	// Get photo details first
+	photo, err := s.GetPhotoByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("photos: get photo for deletion: %w", err)
+	}
+	if photo == nil {
+		return fmt.Errorf("photos: photo not found")
+	}
+
+	// HARD delete from storage (physical files removed)
+	if err := s.storage.Delete(ctx, photo.StorageKeyOrig); err != nil {
+		return fmt.Errorf("photos: delete original: %w", err)
+	}
+	if err := s.storage.Delete(ctx, photo.StorageKeyMobile); err != nil {
+		return fmt.Errorf("photos: delete mobile: %w", err)
+	}
+	if err := s.storage.Delete(ctx, photo.StorageKeyThumb); err != nil {
+		return fmt.Errorf("photos: delete thumb: %w", err)
+	}
+
+	// SOFT delete in database (mark as deleted for audit)
+	const query = `
+		UPDATE photos 
+		SET deleted_at = now(), deleted_by_email = $1, status = 'deleted'
+		WHERE id = $2
+	`
+	_, err = s.db.Exec(ctx, query, deleterEmail, id)
+	return err
+}
+
+// UpdatePhotoEdits updates the photo_edits metadata for non-destructive editing.
+func (s *Service) UpdatePhotoEdits(ctx context.Context, id string, edits map[string]interface{}) error {
+	const query = `
+		UPDATE photos
+		SET photo_edits = $1
+		WHERE id = $2
+	`
+	_, err := s.db.Exec(ctx, query, edits, id)
+	return err
+}
+
+// UpdatePhotoCategory updates the category of a photo (for admin override).
+func (s *Service) UpdatePhotoCategory(ctx context.Context, id, category string) error {
+	const query = `
+		UPDATE photos
+		SET category = $1
+		WHERE id = $2
+	`
+	_, err := s.db.Exec(ctx, query, category, id)
+	return err
+}
+
+// ReanalyzePhoto re-runs AI classification on an existing photo.
+func (s *Service) ReanalyzePhoto(ctx context.Context, id string) error {
+	// Get the photo
+	photo, err := s.GetPhotoByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("photos: get photo: %w", err)
+	}
+	if photo == nil {
+		return fmt.Errorf("photos: photo not found")
+	}
+
+	// Download the original image from storage
+	data, err := s.storage.Get(ctx, photo.StorageKeyOrig)
+	if err != nil {
+		return fmt.Errorf("photos: download image: %w", err)
+	}
+
+	// Detect MIME type
+	mimeType := http.DetectContentType(data)
+
+	// Run AI analysis
+	aiResp, err := ai.AnalyzeImage(ctx, ai.AnalyzeImageRequest{
+		ImageData: data,
+		MimeType:  mimeType,
+	})
+	if err != nil {
+		return fmt.Errorf("photos: AI analysis failed: %w", err)
+	}
+
+	// Prepare AI analysis JSON
+	aiAnalysisJSON := map[string]interface{}{
+		"category":    aiResp.Category,
+		"description": aiResp.Description,
+		"confidence":  aiResp.Confidence,
+	}
+
+	// Update the database with new AI analysis
+	const query = `
+		UPDATE photos
+		SET ai_suggestion = $1, ai_analysis = $2
+		WHERE id = $3
+	`
+	_, err = s.db.Exec(ctx, query, aiResp.Category, aiAnalysisJSON, id)
+	if err != nil {
+		return fmt.Errorf("photos: update AI analysis: %w", err)
+	}
+
+	// If it's a flower_type, also re-run species identification
+	if aiResp.Category == "flower_type" {
+		speciesInfo, err := ai.IdentifyFlowerSpecies(ctx, ai.SpeciesIdentificationRequest{
+			ImageData: data,
+			MimeType:  mimeType,
+		})
+		if err == nil && speciesInfo != nil && speciesInfo.IsSingleFlower {
+			// Update flower info
+			const updateFlowerQuery = `
+				UPDATE photos
+				SET flower_name = $1, wikipedia_url = $2, harvest_season = $3
+				WHERE id = $4
+			`
+			_, err = s.db.Exec(ctx, updateFlowerQuery,
+				speciesInfo.SpeciesName,
+				speciesInfo.WikipediaURL,
+				speciesInfo.SeasonDescription,
+				id,
+			)
+			if err != nil {
+				// Log but don't fail
+				fmt.Printf("photos: failed to update species info: %v\n", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetPhotoByBouquetNumber finds an active photo with the given bouquet number.
+func (s *Service) GetPhotoByBouquetNumber(ctx context.Context, number int) (*Photo, error) {
+	const query = `
+		SELECT id, category, bouquet_number, price_cents, storage_key_mobile, storage_key_thumb
+		FROM photos
+		WHERE bouquet_number = $1 
+		  AND deleted_at IS NULL 
+		  AND purchased_by IS NULL
+		LIMIT 1
+	`
+
+	var p Photo
+	err := s.db.QueryRow(ctx, query, number).Scan(
+		&p.ID, &p.Category, &p.BouquetNumber, &p.PriceCents,
+		&p.StorageKeyMobile, &p.StorageKeyThumb,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("photos: get by bouquet number: %w", err)
+	}
+	return &p, nil
+}
+
+// ReplacePhoto marks an old photo as replaced (soft delete).
+func (s *Service) ReplacePhoto(ctx context.Context, photoID string, reason string) error {
+	const query = `
+		UPDATE photos 
+		SET deleted_at = now(), 
+		    admin_notes = $2,
+		    status = 'replaced'
+		WHERE id = $1
+	`
+	_, err := s.db.Exec(ctx, query, photoID, reason)
+	if err != nil {
+		return fmt.Errorf("photos: replace photo: %w", err)
+	}
+	return nil
+}
+
+// UpdateBouquetInfo updates the bouquet number and price for a photo.
+func (s *Service) UpdateBouquetInfo(ctx context.Context, photoID string, bouquetNumber int, priceCents int) error {
+	const query = `
+		UPDATE photos
+		SET bouquet_number = $1, price_cents = $2
+		WHERE id = $3
+	`
+	_, err := s.db.Exec(ctx, query, bouquetNumber, priceCents, photoID)
+	if err != nil {
+		return fmt.Errorf("photos: update bouquet info: %w", err)
+	}
+	return nil
+}
+
+// GetAvailableBouquets returns all bouquets available for purchase.
+func (s *Service) GetAvailableBouquets(ctx context.Context) ([]*Photo, error) {
+	const query = `
+		SELECT id, bouquet_number, price_cents, storage_key_mobile, storage_key_thumb,
+		       description, exif_taken_at, detected_flowers, ai_analysis, uploaded_at
+		FROM photos
+		WHERE bouquet_number IS NOT NULL 
+		  AND purchased_by IS NULL 
+		  AND deleted_at IS NULL
+		  AND category = 'bouquet'
+		ORDER BY bouquet_number ASC
+	`
+
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("photos: get available bouquets: %w", err)
+	}
+	defer rows.Close()
+
+	bouquets := make([]*Photo, 0)
+	for rows.Next() {
+		var p Photo
+		var detectedFlowersArray []string
+		var aiAnalysisJSON []byte
+
+		err := rows.Scan(
+			&p.ID, &p.BouquetNumber, &p.PriceCents, &p.StorageKeyMobile, &p.StorageKeyThumb,
+			&p.Description, &p.EXIFTakenAt, &detectedFlowersArray, &aiAnalysisJSON, &p.UploadedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("photos: scan bouquet row: %w", err)
+		}
+
+		p.DetectedFlowers = detectedFlowersArray
+
+		// Parse AI analysis JSON
+		if len(aiAnalysisJSON) > 0 {
+			json.Unmarshal(aiAnalysisJSON, &p.AIAnalysis)
+		}
+
+		bouquets = append(bouquets, &p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return bouquets, nil
+}
+
+// MarkBouquetSold marks a bouquet as sold after successful payment.
+func (s *Service) MarkBouquetSold(ctx context.Context, photoID string, userID string) error {
+	const query = `
+		UPDATE photos 
+		SET purchased_by = $1, sold_at = now()
+		WHERE id = $2 AND bouquet_number IS NOT NULL
+	`
+	_, err := s.db.Exec(ctx, query, userID, photoID)
+	if err != nil {
+		return fmt.Errorf("photos: mark bouquet sold: %w", err)
+	}
+	return nil
 }
 
 // ---- Helper functions ----------------------------------------------------
@@ -726,6 +1096,11 @@ func extractFullEXIF(data []byte) map[string]interface{} {
 			result["DateTimeOriginal"] = val
 		}
 	}
+	if tag, err := x.Get(exif.Orientation); err == nil {
+		if val, err := tag.Int(0); err == nil {
+			result["Orientation"] = val
+		}
+	}
 	if tag, err := x.Get(exif.ExposureTime); err == nil {
 		if val, err := tag.Rat(0); err == nil {
 			if f, _ := val.Float64(); f > 0 {
@@ -759,4 +1134,45 @@ func extractFullEXIF(data []byte) map[string]interface{} {
 	}
 
 	return result
+}
+
+// getImageOrientation extracts the EXIF orientation value
+func getImageOrientation(exifMetadata map[string]interface{}) int {
+	if orientation, ok := exifMetadata["Orientation"].(int); ok {
+		return orientation
+	}
+	return 1 // Default: no rotation needed
+}
+
+// autoOrientImage applies EXIF orientation to the image
+// EXIF Orientation values: https://sirv.com/help/articles/rotate-photos-to-be-upright/
+func autoOrientImage(img image.Image, orientation int) image.Image {
+	switch orientation {
+	case 1:
+		// Normal - no transformation needed
+		return img
+	case 2:
+		// Flip horizontal
+		return imaging.FlipH(img)
+	case 3:
+		// Rotate 180°
+		return imaging.Rotate180(img)
+	case 4:
+		// Flip vertical
+		return imaging.FlipV(img)
+	case 5:
+		// Rotate 90° CCW and flip horizontal
+		return imaging.FlipH(imaging.Rotate270(img))
+	case 6:
+		// Rotate 90° CCW (270° CW)
+		return imaging.Rotate270(img)
+	case 7:
+		// Rotate 90° CW and flip horizontal
+		return imaging.FlipH(imaging.Rotate90(img))
+	case 8:
+		// Rotate 90° CW (270° CCW)
+		return imaging.Rotate90(img)
+	default:
+		return img
+	}
 }

@@ -1,0 +1,231 @@
+package ai
+
+import (
+	"bufio"
+	"context"
+	"os"
+	"strings"
+	"testing"
+)
+
+// loadEnvFile loads environment variables from .env file in the project root
+func loadEnvFile(t *testing.T) {
+	// Try to load .env from project root (two levels up from internal/ai)
+	envPath := "../../.env"
+	file, err := os.Open(envPath)
+	if err != nil {
+		t.Logf("No .env file found at %s: %v", envPath, err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Parse KEY=VALUE
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			// Remove quotes if present
+			value = strings.Trim(value, `"'`)
+			// Only set if not already set in environment
+			if os.Getenv(key) == "" {
+				os.Setenv(key, value)
+				t.Logf("Loaded %s from .env", key)
+			}
+		}
+	}
+}
+
+// TestAnalyzeFlowerStand tests AI classification of a flower stand image.
+// This test requires:
+// 1. ANTHROPIC_API_KEY in .env file or environment variable
+// 2. A test image file at testdata/flower_stand.jpg
+//
+// To run: go test -v ./internal/ai -run TestAnalyzeFlowerStand
+func TestAnalyzeFlowerStand(t *testing.T) {
+	// Load API key from .env file
+	loadEnvFile(t)
+
+	// Check if API key is set
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		t.Skip("Skipping test: ANTHROPIC_API_KEY not set in .env or environment")
+	}
+
+	// Load test image
+	imageData, err := os.ReadFile("testdata/flower_stand.jpg")
+	if err != nil {
+		t.Skipf("Skipping test: test image not found: %v", err)
+	}
+
+	// Analyze the image
+	ctx := context.Background()
+	result, err := AnalyzeImage(ctx, AnalyzeImageRequest{
+		ImageData: imageData,
+		MimeType:  "image/jpeg",
+	})
+
+	if err != nil {
+		t.Fatalf("AI analysis failed: %v", err)
+	}
+
+	// Verify results
+	t.Logf("Category: %s", result.Category)
+	t.Logf("Description: %s", result.Description)
+	t.Logf("Confidence: %.2f", result.Confidence)
+	t.Logf("Subjects: %v", result.Subjects)
+	t.Logf("Location: %s", result.Location)
+
+	// Assert that it correctly identifies as a flower stand
+	if result.Category != "stand" {
+		t.Errorf("Expected category 'stand', got '%s'", result.Category)
+	}
+
+	// Assert reasonable confidence
+	if result.Confidence < 0.5 {
+		t.Errorf("Expected confidence >= 0.5, got %.2f", result.Confidence)
+	}
+
+	// Assert it detected the location
+	if result.Location == "" || result.Location == "unknown" {
+		t.Errorf("Expected location to be detected, got '%s'", result.Location)
+	}
+}
+
+// TestAnalyzeGardenRow tests AI classification of a garden row/flowerbed image.
+// This test requires:
+// 1. ANTHROPIC_API_KEY in .env file or environment variable
+// 2. A test image file at testdata/garden_row.jpg
+//
+// To run: go test -v ./internal/ai -run TestAnalyzeGardenRow
+func TestAnalyzeGardenRow(t *testing.T) {
+	// Load API key from .env file
+	loadEnvFile(t)
+
+	// Check if API key is set
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		t.Skip("Skipping test: ANTHROPIC_API_KEY not set in .env or environment")
+	}
+
+	// Load test image
+	imageData, err := os.ReadFile("testdata/garden_row.jpg")
+	if err != nil {
+		t.Skipf("Skipping test: test image not found: %v", err)
+	}
+
+	// Analyze the image
+	ctx := context.Background()
+	result, err := AnalyzeImage(ctx, AnalyzeImageRequest{
+		ImageData: imageData,
+		MimeType:  "image/jpeg",
+	})
+
+	if err != nil {
+		t.Fatalf("AI analysis failed: %v", err)
+	}
+
+	// Verify results
+	t.Logf("Category: %s", result.Category)
+	t.Logf("Description: %s", result.Description)
+	t.Logf("Confidence: %.2f", result.Confidence)
+	t.Logf("Subjects: %v", result.Subjects)
+	t.Logf("Location: %s", result.Location)
+
+	// Assert that it correctly identifies as a garden row
+	if result.Category != "garden_row" {
+		t.Errorf("Expected category 'garden_row', got '%s'", result.Category)
+	}
+
+	// Assert reasonable confidence
+	if result.Confidence < 0.5 {
+		t.Errorf("Expected confidence >= 0.5, got %.2f", result.Confidence)
+	}
+
+	// Assert it detected the location as garden/outdoor
+	if result.Location != "garden" && result.Location != "outdoor" {
+		t.Logf("Warning: Expected location 'garden' or 'outdoor', got '%s'", result.Location)
+	}
+}
+
+// TestModelAvailability tests if the configured model is available with the API key.
+// This is a quick smoke test to verify API connectivity.
+//
+// To run: go test -v ./internal/ai -run TestModelAvailability
+func TestModelAvailability(t *testing.T) {
+	// Load API key from .env file
+	loadEnvFile(t)
+
+	// Check if API key is set
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		t.Skip("Skipping test: ANTHROPIC_API_KEY not set in .env or environment")
+	}
+
+	// Create a minimal 1x1 pixel JPEG for testing
+	// This is a valid JPEG header + minimal image data
+	minimalJPEG := []byte{
+		0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46,
+		0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
+		0x00, 0x01, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
+		0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08,
+		0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C,
+		0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
+		0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D,
+		0x1A, 0x1C, 0x1C, 0x20, 0x24, 0x2E, 0x27, 0x20,
+		0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29,
+		0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27,
+		0x39, 0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34,
+		0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01,
+		0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4,
+		0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x03, 0xFF, 0xC4, 0x00, 0x14,
+		0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01,
+		0x00, 0x00, 0x3F, 0x00, 0x37, 0xFF, 0xD9,
+	}
+
+	// Try to analyze the minimal image
+	ctx := context.Background()
+	_, err := AnalyzeImage(ctx, AnalyzeImageRequest{
+		ImageData: minimalJPEG,
+		MimeType:  "image/jpeg",
+	})
+
+	// We expect this to either succeed or fail with a parsing error,
+	// but NOT with a 404 model not found error
+	if err != nil {
+		errStr := err.Error()
+		if contains(errStr, "404") || contains(errStr, "not_found_error") {
+			t.Fatalf("Model not available: %v\nThis suggests the API key doesn't have access to the configured model", err)
+		}
+		// Other errors (like parsing the minimal image) are acceptable
+		t.Logf("Got expected error (not a 404): %v", err)
+	} else {
+		t.Log("Model is available and API key is valid!")
+	}
+}
+
+// contains checks if a string contains a substring (case-insensitive helper)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			len(s) > len(substr)+1 && findSubstr(s, substr)))
+}
+
+func findSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

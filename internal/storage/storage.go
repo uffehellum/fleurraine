@@ -68,8 +68,8 @@ func (c *Client) Put(ctx context.Context, key, contentType string, body io.Reade
 	return nil
 }
 
-// Get fetches the object at key. The caller must close the returned ReadCloser.
-func (c *Client) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+// Get fetches the object at key and returns the full content as bytes.
+func (c *Client) Get(ctx context.Context, key string) ([]byte, error) {
 	out, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(key),
@@ -77,7 +77,13 @@ func (c *Client) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("storage: Get %q: %w", key, err)
 	}
-	return out.Body, nil
+	defer out.Body.Close()
+	
+	data, err := io.ReadAll(out.Body)
+	if err != nil {
+		return nil, fmt.Errorf("storage: read %q: %w", key, err)
+	}
+	return data, nil
 }
 
 // Delete removes the object at key from storage.

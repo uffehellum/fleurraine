@@ -248,6 +248,113 @@ func (h *Handlers) HandleApproveReview(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// HandleDelete handles DELETE /api/photos/{id}
+// Soft deletes a photo (marks as deleted in DB, hard deletes from storage) - admin only.
+func (h *Handlers) HandleDelete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "photo ID required")
+		return
+	}
+
+	// Get admin user email for audit trail
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	if err := h.service.DeletePhoto(r.Context(), id, user.Email); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleUpdateEdits handles PUT /api/photos/{id}/edits
+// Updates photo editing metadata (rotation, crop) - admin only.
+func (h *Handlers) HandleUpdateEdits(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "photo ID required")
+		return
+	}
+
+	var edits map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&edits); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.service.UpdatePhotoEdits(r.Context(), id, edits); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleUpdateCategory handles PUT /api/photos/{id}/category
+// Updates photo category (admin override of AI suggestion) - admin only.
+func (h *Handlers) HandleUpdateCategory(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "photo ID required")
+		return
+	}
+
+	var req struct {
+		Category string `json:"category"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Category == "" {
+		writeError(w, http.StatusBadRequest, "category required")
+		return
+	}
+
+	if err := h.service.UpdatePhotoCategory(r.Context(), id, req.Category); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleReanalyze handles POST /api/photos/{id}/reanalyze
+// Re-runs AI classification on a photo (admin only).
+func (h *Handlers) HandleReanalyze(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "photo ID required")
+		return
+	}
+
+	if err := h.service.ReanalyzePhoto(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleGetAvailableBouquets handles GET /api/bouquets/available
+// Returns all numbered bouquets available for purchase (public access).
+func (h *Handlers) HandleGetAvailableBouquets(w http.ResponseWriter, r *http.Request) {
+	bouquets, err := h.service.GetAvailableBouquets(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(bouquets)
+}
+
 // writeError writes a JSON error response.
 func writeError(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")

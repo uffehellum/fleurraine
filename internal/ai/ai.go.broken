@@ -1,0 +1,206 @@
+// Package ai wraps the Anthropic Claude Vision API for photo category suggestions.
+package ai
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"os"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
+)
+
+// AnalyzeImageRequest holds the parameters for image analysis.
+type AnalyzeImageRequest struct {
+	// ImageData is the raw image bytes (JPEG, PNG, WebP, or GIF).
+	ImageData []byte
+	// MimeType is the MIME type of the image (e.g., "image/jpeg").
+	MimeType string
+	// Prompt is an optional custom prompt. If empty, a default prompt is used.
+	Prompt string
+}
+
+// AnalyzeImageResponse holds the AI's analysis of the image.
+type AnalyzeImageResponse struct {
+	// Category is the suggested category (e.g., "stand", "bouquet", "flower_type", "garden_row").
+	Category string `json:"category"`
+	// Description is a brief description of what's in the image.
+	Description string `json:"description"`
+	// Confidence is a rough confidence score (0.0 to 1.0).
+	Confidence float64 `json:"confidence"`
+	// Subjects lists detected subjects (e.g., ["sunflower", "rose", "person"]).
+	Subjects []string `json:"subjects"`
+	// Location is the detected location type (e.g., "flower_stand", "garden", "indoor").
+	Location string `json:"location"`
+}
+
+// AnalyzeImage sends an image to Claude Vision API for content analysis.
+// It returns structured information about the image content, including category,
+// description, detected subjects, and location.
+func AnalyzeImage(ctx context.Context, req AnalyzeImageRequest) (*AnalyzeImageResponse, error) {
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("ai: ANTHROPIC_API_KEY is required")
+	}
+
+	// Create Anthropic client
+	client := anthropic.NewClient(option.WithAPIKey(apiKey))
+
+	// Default prompt if none provided
+	prompt := req.Prompt
+	if prompt == "" {
+		prompt = `You are analyzing photos for Fleurraine, a local flower farm that sells fresh-cut flowers from a roadside stand.
+
+Analyze this image and provide a JSON response with the following fields:
+- category: one of "stand" (flower stand/display with buckets of cut flowers), "bouquet" (arranged cut flowers in a vase or wrap), "flower_type" (close-up of individual flower species for catalog), "garden_row" (flowers growing in organized garden beds/rows), or "other"
+- description: a brief description of what's in the image (1-2 sentences)
+- confidence: your confidence in the category (0.0 to 1.0)
+- subjects: array of detected subjects (specific flower types like "sunflower", "dahlia", "zinnia", "rose", etc.)
+- location: detected location type ("flower_stand", "garden", "indoor", "outdoor", "unknown")
+
+CATEGORY IDENTIFICATION GUIDE:
+- "stand": Look for buckets/containers with multiple cut flower varieties displayed together, typically outdoors at a roadside stand
+- "bouquet": Arranged cut flowers in a vase, wrap, or hand-held arrangement
+- "flower_type": Close-up photo of a single flower species, suitable for a flower catalog
+- "garden_row": Flowers growing in organized rows or beds in a garden setting
+
+Be specific with flower types in the subjects array. Common Fleurraine flowers include: sunflowers, dahlias, zinnias, cosmos, celosia, snapdragons, marigolds, asters, and various seasonal blooms.
+
+Respond ONLY with valid JSON, no additional text.`
+	}
+
+	// Encode image to base64
+	base64Image := base64.StdEncoding.EncodeToString(req.ImageData)
+
+	// Create message with image and prompt
+	message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaude3_5Sonnet20241022,
+		MaxTokens: 1024,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(
+				anthropic.ImageBlockParam{
+					Type: anthropic.F(anthropic.ImageBlockParamTypeImage),
+					Source: anthropic.F(anthropic.ImageBlockParamSource{
+						Type:      anthropic.F(anthropic.ImageBlockParamSourceTypeBase64),
+						MediaType: anthropic.F(req.MimeType),
+						Data:      anthropic.F(base64Image),
+					}),
+				},
+				anthropic.TextBlockParam{
+					Type: anthropic.F(anthropic.TextBlockParamTypeText),
+					Text: anthropic.F(prompt),
+				},
+			),
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("ai: API request failed: %w", err)
+	}
+
+	// Extract text content from response
+	if len(message.Content) == 0 {
+		return nil, fmt.Errorf("ai: empty response from API")
+	}
+
+	textBlock, ok := message.Content[0].AsUnion().(anthropic.TextBlock)
+	if !ok {
+		return nil, fmt.Errorf("ai: unexpected response type")
+	}
+
+	// Parse the AI's JSON response
+	var result AnalyzeImageResponse
+	if err := json.Unmarshal([]byte(textBlock.Text), &result); err != nil {
+		return nil, fmt.Errorf("ai: parse AI response JSON: %w (response: %s)", err, textBlock.Text)
+	}
+
+	return &result, nil
+}
+
+// VerifyFlowerImage checks if an image actually contains flowers from Fleurraine.
+// This is used for consumer review verification to ensure submitted images
+// are relevant photos of Fleurraine flowers (not random images).
+func VerifyFlowerImage(ctx context.Context, imageData []byte, mimeType string) (bool, string, error) {
+	prompt := `You are verifying customer review photos for Fleurraine, a local flower farm.
+
+Analyze this image and determine if it shows fresh-cut flowers that could plausibly be from Fleurraine's flower stand.
+
+ACCEPT if the image shows:
+- Fresh cut flowers in a vase, bouquet, or arrangement
+- Flowers that appear to be recently purchased (not wilted or dying)
+- Common garden flowers like sunflowers, dahlias, zinnias, cosmos, etc.
+- Flowers displayed in a home setting
+
+REJECT if the image shows:
+- No flowers at all
+- Artificial/fake flowers
+- Flowers that are clearly not from a local farm (e.g., tropical flowers, roses from a florist)
+- Unrelated content (food, pets, landscapes without flowers, etc.)
+- Severely wilted or dead flowers
+
+Respond with a JSON object containing:
+- contains_flowers: boolean (true if this appears to be a valid Fleurraine flower photo, false otherwise)
+- reason: string (brief explanation of your determination)
+
+Respond ONLY with valid JSON, no additional text.`
+
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		return false, "", fmt.Errorf("ai: ANTHROPIC_API_KEY is required")
+	}
+
+	// Create Anthropic client
+	client := anthropic.NewClient(option.WithAPIKey(apiKey))
+
+	// Encode image to base64
+	base64Image := base64.StdEncoding.EncodeToString(imageData)
+
+	// Create message with image and prompt
+	message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaude3_5Sonnet20241022,
+		MaxTokens: 512,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(
+				anthropic.ImageBlockParam{
+					Type: anthropic.F(anthropic.ImageBlockParamTypeImage),
+					Source: anthropic.F(anthropic.ImageBlockParamSource{
+						Type:      anthropic.F(anthropic.ImageBlockParamSourceTypeBase64),
+						MediaType: anthropic.F(mimeType),
+						Data:      anthropic.F(base64Image),
+					}),
+				},
+				anthropic.TextBlockParam{
+					Type: anthropic.F(anthropic.TextBlockParamTypeText),
+					Text: anthropic.F(prompt),
+				},
+			),
+		},
+	})
+
+	if err != nil {
+		return false, "", fmt.Errorf("ai: API request failed: %w", err)
+	}
+
+	// Extract text content from response
+	if len(message.Content) == 0 {
+		return false, "", fmt.Errorf("ai: empty response from API")
+	}
+
+	textBlock, ok := message.Content[0].AsUnion().(anthropic.TextBlock)
+	if !ok {
+		return false, "", fmt.Errorf("ai: unexpected response type")
+	}
+
+	// Parse the AI's JSON response
+	var result struct {
+		ContainsFlowers bool   `json:"contains_flowers"`
+		Reason          string `json:"reason"`
+	}
+	if err := json.Unmarshal([]byte(textBlock.Text), &result); err != nil {
+		return false, "", fmt.Errorf("ai: parse AI response JSON: %w (response: %s)", err, textBlock.Text)
+	}
+
+	return result.ContainsFlowers, result.Reason, nil
+}

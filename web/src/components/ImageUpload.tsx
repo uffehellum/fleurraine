@@ -11,10 +11,8 @@ export default function ImageUpload({
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -30,31 +28,19 @@ export default function ImageUpload({
       return;
     }
 
-    setSelectedFile(file);
     setError(null);
 
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Auto-upload immediately after file selection
+    await uploadFile(file);
   };
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedFile) {
-      setError('Please select an image');
-      return;
-    }
-
+  const uploadFile = async (file: File) => {
     setUploading(true);
     setError(null);
 
     try {
       const formData = new FormData();
-      formData.append('image', selectedFile);
+      formData.append('image', file);
       if (isReview) formData.append('is_review', 'true');
 
       const response = await fetch('/api/photos/upload', {
@@ -64,15 +50,23 @@ export default function ImageUpload({
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Upload failed');
+        const text = await response.text();
+        let errorMessage = 'Upload failed';
+        try {
+          const data = JSON.parse(text);
+          errorMessage = data.error || errorMessage;
+        } catch {
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      const photo = await response.json();
+      const text = await response.text();
+      if (!text) {
+        throw new Error('Server returned empty response');
+      }
       
-      // Reset form
-      setSelectedFile(null);
-      setPreview(null);
+      const photo = JSON.parse(text);
       
       if (onUploadSuccess) {
         onUploadSuccess(photo);
@@ -87,16 +81,16 @@ export default function ImageUpload({
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="font-heading text-2xl mb-2">
-        {isReview ? 'Share Your Flowers' : 'Add Photo'}
+        {isReview ? 'Share Your Flowers' : 'Upload Photo'}
       </h2>
       <p className="text-gray-600 text-sm mb-6">
         {isReview 
           ? 'Take a photo of your Fleurraine bouquet to share'
-          : 'AI will automatically detect and categorize your photo'}
+          : 'Photo will be uploaded and analyzed automatically'}
       </p>
 
-      <form onSubmit={handleUpload} className="space-y-4">
-        {/* Camera/File input - optimized for mobile */}
+      <div className="space-y-4">
+        {/* Camera/File input - auto-uploads on selection */}
         <div>
           <input
             type="file"
@@ -105,36 +99,38 @@ export default function ImageUpload({
             onChange={handleFileSelect}
             className="hidden"
             id="photo-input"
+            disabled={uploading}
           />
           <label
             htmlFor="photo-input"
-            className="flex items-center justify-center gap-3 w-full bg-green-600 text-white py-4 px-6 rounded-lg
-              hover:bg-green-700 active:bg-green-800 cursor-pointer font-medium text-lg
-              transition-colors shadow-md"
+            className={`flex items-center justify-center gap-3 w-full py-4 px-6 rounded-lg
+              font-medium text-lg transition-colors shadow-md ${
+                uploading
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800 cursor-pointer'
+              }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {selectedFile ? 'Change Photo' : 'Take or Upload Photo'}
+            {uploading ? (
+              <>
+                <svg className="animate-spin h-6 w-6" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Uploading & Analyzing...
+              </>
+            ) : (
+              <>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Take or Upload Photo
+              </>
+            )}
           </label>
         </div>
-
-        {/* Preview */}
-        {preview && (
-          <div className="relative">
-            <img
-              src={preview}
-              alt="Preview"
-              className="w-full h-auto rounded-lg shadow-md"
-            />
-            <div className="mt-2 text-sm text-gray-600 text-center">
-              ✨ AI will analyze this photo automatically
-            </div>
-          </div>
-        )}
 
         {/* Error message */}
         {error && (
@@ -145,35 +141,7 @@ export default function ImageUpload({
             <span>{error}</span>
           </div>
         )}
-
-        {/* Submit button */}
-        {selectedFile && (
-          <button
-            type="submit"
-            disabled={uploading}
-            className="w-full bg-accent text-white py-4 px-6 rounded-lg
-              hover:bg-accent/90 disabled:bg-gray-300 disabled:cursor-not-allowed
-              font-medium text-lg transition-colors shadow-md flex items-center justify-center gap-2"
-          >
-            {uploading ? (
-              <>
-                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Uploading & Analyzing...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Upload Photo
-              </>
-            )}
-          </button>
-        )}
-      </form>
+      </div>
     </div>
   );
 }
