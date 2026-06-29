@@ -124,6 +124,7 @@ func main() {
 			r.Delete("/{id}", photoHandlers.HandleDelete)
 			r.Put("/{id}/edits", photoHandlers.HandleUpdateEdits)
 			r.Put("/{id}/category", photoHandlers.HandleUpdateCategory)
+			r.Put("/{id}/metadata", photoHandlers.HandleUpdateMetadata)
 		})
 	})
 
@@ -131,6 +132,13 @@ func main() {
 	r.Route("/api/bouquets", func(r chi.Router) {
 		// Public routes
 		r.Get("/available", photoHandlers.HandleGetAvailableBouquets)
+		r.Get("/all", photoHandlers.HandleGetAllBouquets)
+
+		// Protected routes (require authentication)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAuth)
+			r.Post("/{id}/purchase", photoHandlers.HandlePurchaseBouquet)
+		})
 	})
 
 	// ── Storage proxy route (for serving images) ─────────────────────────────

@@ -10,7 +10,6 @@ const publicLinks = [
   { to: "/bouquets", label: "Bouquets", icon: "💐" },
   { to: "/season", label: "Season", icon: "📅" },
   { to: "/orders", label: "Orders", icon: "📦" },
-  { to: "/subscribe", label: "Subscribe", icon: "⭐" },
 ];
 
 const adminLinks = [

@@ -14,7 +14,6 @@ import Bouquets from "./pages/Bouquets";
 import BouquetDetail from "./pages/BouquetDetail";
 import Season from "./pages/Season";
 import Orders from "./pages/Orders";
-import Subscribe from "./pages/Subscribe";
 import AdminQueue from "./pages/AdminQueue";
 import AdminOrders from "./pages/AdminOrders";
 import AdminAnalytics from "./pages/AdminAnalytics";
@@ -43,17 +42,9 @@ export default function App() {
             <Route path="/sign-in" element={<SignIn />} />
             <Route
               path="/orders"
-              element={
+              element = {
                 <ProtectedRoute>
                   <Orders />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/subscribe"
-              element={
-                <ProtectedRoute>
-                  <Subscribe />
                 </ProtectedRoute>
               }
             />
