@@ -392,6 +392,30 @@ func (h *Handlers) HandlePurchaseBouquet(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string]string{"message": "bouquet purchased successfully"})
 }
 
+// HandleHoldBouquet handles POST /api/bouquets/{id}/hold
+// Authenticated user places a bouquet on Venmo pending hold.
+func (h *Handlers) HandleHoldBouquet(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "bouquet ID required")
+		return
+	}
+
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	if err := h.service.HoldBouquet(r.Context(), id, user.ID, user.Email, user.DisplayName); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "bouquet placed on Venmo hold successfully"})
+}
+
 // HandleUpdateMetadata handles PUT /api/photos/{id}/metadata
 // Updates all metadata fields for a photo (admin only).
 func (h *Handlers) HandleUpdateMetadata(w http.ResponseWriter, r *http.Request) {

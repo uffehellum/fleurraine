@@ -138,6 +138,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth)
 			r.Post("/{id}/purchase", photoHandlers.HandlePurchaseBouquet)
+			r.Post("/{id}/hold", photoHandlers.HandleHoldBouquet)
 		})
 	})
 

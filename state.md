@@ -10,18 +10,20 @@ Every image uploaded by an administrator undergoes automatic classification by o
 
 ### 1.1 Core Upload & Classification Flow
 
-When an admin uploads a photo, it starts in the `pending` status. The AI classifies it and populates suggestions. When approved or edited, it transitions to `published`.
+When an admin uploads a photo, it starts in the `pending` status. The AI classifies it, populates suggestions, and the system performs a proximity check / OpenStreetMap Nominatim reverse geocode lookup. When approved or edited, it transitions to `published`.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Pending : Admin Upload
-    Pending --> Scanning : AI Scan (Tigris Storage + Vision API)
+    Pending --> Scanning : AI Scan (Tigris Vision) & OSM Reverse Geocoding
     Scanning --> AutoAssigned : AI Classifies Category (Stand, Bouquet, Flower, Garden Row)
     AutoAssigned --> Published : Admin Confirms (Published Status)
     AutoAssigned --> EditedByAdmin : Admin Overrides Category/Metadata
     EditedByAdmin --> Published : Admin Publishes
     Published --> Deleted : Admin Soft Deletes (Files Hard-deleted, DB status changed)
 ```
+
+> **Note on Geocoding Soft Dependency:** Location geocoding is powered by a soft-dependency on OpenStreetMap's free Nominatim reverse-geocoding API. To respect OSM policies, a custom User-Agent is sent, and a 2-second timeout protects the upload workflow. If Nominatim is offline or times out, the system seamlessly falls back to formatting the raw GPS coordinates.
 
 ---
 
@@ -91,6 +93,20 @@ stateDiagram-v2
     end note
     Published --> Deleted : Admin Deletes
 ```
+
+---
+
+### 1.6 Summary of Photo States & Purchase Conditions
+
+Administrators can inspect the `status` and `purchased_by` columns in the database directly. The table below outlines how the system evaluates these states across the client views:
+
+| Database `status` | `purchased_by` | Category | Visibility in public galleries | Purchase Button Visible |
+| :--- | :--- | :--- | :--- | :--- |
+| **`pending`** | `NULL` | Any | Hidden (Admin Queue only) | ❌ No |
+| **`published`** | `NULL` | `'bouquet'` | **Visible** in Bouquet Gallery | **✔️ Yes** (Only available state) |
+| **`published`** | `UUID` | `'bouquet'` | **Visible** in "All" tab (marked Sold) | ❌ No (Renders "Sold Out" banner) |
+| **`replaced`** | Any | Any | Hidden | ❌ No |
+| **`deleted`** | Any | Any | Hidden (Loads deleted notice on deep link) | ❌ No |
 
 ---
 

@@ -666,6 +666,7 @@ func (s *Service) GetPhotoByID(ctx context.Context, id string) (*Photo, error) {
 		       p.is_review, p.review_verified, p.review_approved, p.reviewed_by, p.reviewed_at,
 		       p.wikipedia_url, p.share_token, p.photo_edits, p.detected_location,
 		       p.bouquet_number, p.price_cents, p.row_numbers, p.flower_names,
+		       p.purchased_by, p.sold_at,
 		       u.email, u.display_name
 		FROM photos p
 		LEFT JOIN users u ON p.uploaded_by = u.id
@@ -683,6 +684,7 @@ func (s *Service) GetPhotoByID(ctx context.Context, id string) (*Photo, error) {
 		&p.IsReview, &p.ReviewVerified, &p.ReviewApproved, &p.ReviewedBy, &p.ReviewedAt,
 		&p.WikipediaURL, &p.ShareToken, &photoEditsJSON, &p.DetectedLocation,
 		&p.BouquetNumber, &p.PriceCents, &p.RowNumbers, &p.FlowerNames,
+		&p.PurchasedBy, &p.SoldAt,
 		&p.UploadedByEmail, &p.UploadedByName,
 	)
 	if err == pgx.ErrNoRows {
@@ -1107,6 +1109,63 @@ func (s *Service) GetAllBouquets(ctx context.Context) ([]*Photo, error) {
 	}
 
 	return bouquets, nil
+}
+
+// HoldBouquet marks a bouquet as pending (Venmo hold) and triggers email.
+func (s *Service) HoldBouquet(ctx context.Context, id string, userID string, userEmail string, userName string) error {
+	// Get bouquet details first
+	photo, err := s.GetPhotoByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("photos: failed to find bouquet for hold: %w", err)
+	}
+	if photo == nil {
+		return fmt.Errorf("photos: bouquet not found")
+	}
+	if photo.Category != "bouquet" || photo.BouquetNumber == nil {
+		return fmt.Errorf("photos: photo is not a numbered bouquet")
+	}
+	if photo.Status != "published" {
+		return fmt.Errorf("photos: bouquet is not active for hold")
+	}
+	if photo.PurchasedBy != nil {
+		return fmt.Errorf("photos: bouquet is already sold")
+	}
+
+	// Place on hold by moving back to pending status
+	const query = `
+		UPDATE photos
+		SET status = 'pending'
+		WHERE id = $1 AND category = 'bouquet' AND status = 'published' AND purchased_by IS NULL
+	`
+	_, err = s.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("photos: failed to place hold: %w", err)
+	}
+
+	// Trigger Email Notification to Lorraine
+	adminEmail := os.Getenv("ADMIN_EMAIL")
+	if adminEmail == "" {
+		adminEmail = "lorraine.hellum@gmail.com"
+	}
+
+	subject := fmt.Sprintf("⏳ Venmo Hold: Bouquet #%d", *photo.BouquetNumber)
+	body := fmt.Sprintf(`Hi Lorraine,
+
+Customer %s (%s) has selected Bouquet #%d and has been redirected to Venmo to complete payment.
+
+The bouquet has been placed on a temporary "Pending" hold to prevent other customers from purchasing it. It is no longer visible on the stand.
+
+Please verify the payment on your Venmo account. Once confirmed, you can mark it as "Sold" or manually update its status from your Admin Queue.
+
+Best,
+Fleurraine System`, userName, userEmail, *photo.BouquetNumber)
+
+	err = email.Send(ctx, subject, body)
+	if err != nil {
+		fmt.Printf("Warning: failed to send hold email: %v\n", err)
+	}
+
+	return nil
 }
 
 // MarkBouquetSold marks a bouquet as sold after successful payment.

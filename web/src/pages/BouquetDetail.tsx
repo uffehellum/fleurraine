@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface Bouquet {
   id: string;
+  category: string;
+  status: string;
   bouquet_number: number;
   price_cents: number;
   storage_key_mobile: string;
@@ -88,23 +90,54 @@ export default function BouquetDetail() {
     }
   };
 
-  const handleVenmo = () => {
+  const handleVenmo = async () => {
     if (!bouquet) return;
-     
-    const venmoUsername = import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum';
-    const note = `Bouquet #${bouquet.bouquet_number}`;
-    const amount = (bouquet.price_cents / 100).toFixed(2);
-    
-    // Venmo deep link
-    const venmoUrl = `venmo://paycharge?txn=pay&recipients=${venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
-    
-    // Try to open Venmo app, fallback to web
-    window.location.href = venmoUrl;
-    
-    // Fallback to web after a delay if app doesn't open
-    setTimeout(() => {
-      window.open(`https://venmo.com/${venmoUsername}?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`, '_blank');
-    }, 1000);
+
+    if (!user) {
+      alert('Please sign in to place this bouquet on hold and complete payment via Venmo.');
+      localStorage.setItem('authReturnTo', window.location.pathname);
+      navigate('/sign-in');
+      return;
+    }
+
+    const confirmHold = window.confirm(`Confirm putting Bouquet #${bouquet.bouquet_number} on hold while you pay $${(bouquet.price_cents / 100).toFixed(2)} on Venmo?`);
+    if (!confirmHold) return;
+
+    try {
+      // 1. Backend API call to place bouquet on hold
+      const response = await fetch(`/api/bouquets/${id}/hold`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to place hold');
+      }
+
+      alert(`⏳ Placing Bouquet #${bouquet.bouquet_number} on a temporary hold for you. Now redirecting you to Venmo to complete payment...`);
+
+      const venmoUsername = import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum';
+      const note = `Bouquet #${bouquet.bouquet_number}`;
+      const amount = (bouquet.price_cents / 100).toFixed(2);
+      
+      // Venmo deep link
+      const venmoUrl = `venmo://paycharge?txn=pay&recipients=${venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
+      
+      // Try to open Venmo app, fallback to web
+      window.location.href = venmoUrl;
+      
+      // Fallback to web after a delay if app doesn't open
+      setTimeout(() => {
+        window.open(`https://venmo.com/${venmoUsername}?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`, '_blank');
+      }, 1000);
+
+      // Reload state so the button reflects the updated pending state
+      fetchBouquet();
+    } catch (err) {
+      console.error('Venmo hold failed:', err);
+      alert(err instanceof Error ? err.message : 'Failed to place hold. Please try again.');
+    }
   };
 
   const handleApplePay = async () => {
@@ -258,8 +291,8 @@ export default function BouquetDetail() {
 
       {/* Action buttons */}
       <div className="space-y-3">
-        {/* Purchase options only show when available */}
-        {!bouquet.purchased_by && (
+        {/* Purchase options only show when published/active and not sold */}
+        {bouquet.status === 'published' && !bouquet.purchased_by && (
           <>
             {/* Apple Pay button */}
             <button
