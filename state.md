@@ -37,7 +37,11 @@ stateDiagram-v2
         - purchased_by (User ID)
         - sold_at (Timestamp)
     end note
-    Available --> Stand : Moved to Stand (Categorized as Stand picture)
+    Available --> MovedToStand : Physically Moved to Stand
+    note right of MovedToStand
+        Photo remains categorized as Bouquet;
+        separate new overall photo of stand is taken.
+    end note
     Available --> Discarded : Unsold/Expired Bouquet
     Available --> Deleted : Admin Deletes
 ```
