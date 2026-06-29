@@ -1,15 +1,12 @@
 import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PullToRefresh from "./PullToRefresh";
 
-const publicLinks = [
+const basePublicLinks = [
   { to: "/", label: "Home", icon: "🏠" },
   { to: "/flowers", label: "Flowers", icon: "🌸" },
   { to: "/garden", label: "Garden", icon: "🌿" },
-  { to: "/bouquets", label: "Bouquets", icon: "💐" },
-  { to: "/season", label: "Season", icon: "📅" },
-  { to: "/orders", label: "Orders", icon: "📦" },
 ];
 
 const adminLinks = [
@@ -22,6 +19,27 @@ const adminLinks = [
 export default function Layout() {
   const { user, isAdmin, loading, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hasAvailableBouquets, setHasAvailableBouquets] = useState(false);
+
+  useEffect(() => {
+    fetchBouquetAvailability();
+  }, []);
+
+  const fetchBouquetAvailability = async () => {
+    try {
+      const response = await fetch("/api/bouquets/available");
+      if (response.ok) {
+        const data = await response.json();
+        setHasAvailableBouquets(data && data.length > 0);
+      }
+    } catch (err) {
+      console.error("Failed to check bouquet availability:", err);
+    }
+  };
+
+  const publicLinks = hasAvailableBouquets
+    ? [...basePublicLinks, { to: "/bouquets", label: "Bouquets", icon: "💐" }]
+    : basePublicLinks;
 
   return (
     <PullToRefresh>

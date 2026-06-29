@@ -122,6 +122,29 @@ To support fast grouped and categorized views (such as showing the newest photo 
 ### 3.2 High-Performance Indexes
 In standard B-tree indexes, queries searching within arrays are slow because PostgreSQL must scan every row. Fleurraine utilizes GIN indexes:
 
+```zsh
+% fly postgres connect -a fleurraine-db 
+postgres-# \c fleurraine
+fleurraine-# \d
+                    List of relations
+ Schema |          Name           |   Type   |   Owner    
+--------+-------------------------+----------+------------
+ public | analytics_events        | table    | fleurraine
+ public | analytics_events_id_seq | sequence | fleurraine
+ public | bouquet_purchases       | table    | fleurraine
+ public | orders                  | table    | fleurraine
+ public | photos                  | table    | fleurraine
+ public | registration_limits     | table    | fleurraine
+ public | schema_migrations       | table    | fleurraine
+ public | season_selections       | table    | fleurraine
+ public | sessions                | table    | fleurraine
+ public | subscriptions           | table    | fleurraine
+ public | user_audit_log          | table    | fleurraine
+ public | users                   | table    | fleurraine
+(12 rows)
+
+```
+
 ```sql
 -- Index for querying multi-flower photos instantly
 CREATE INDEX IF NOT EXISTS idx_photos_flower_names 

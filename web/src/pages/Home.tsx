@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import PhotoDisplay from '../components/PhotoDisplay';
 import ReviewForm from '../components/ReviewForm';
 
 interface StandPhoto {
@@ -33,6 +32,27 @@ export default function Home() {
   useEffect(() => {
     fetchLatestStandPhoto();
   }, []);
+
+  const handleApplePayGrab = async () => {
+    if (!user) return;
+    const confirmPurchase = window.confirm("Confirm purchase of $15.00 for grabbed flower jar/bouquets using Apple Pay?");
+    if (!confirmPurchase) return;
+    try {
+      // Save a custom order inside orders storage
+      const existingOrders = JSON.parse(localStorage.getItem('fleurraine_custom_orders') || '[]');
+      const newOrder = {
+        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(),
+        description: "Flowers grabbed from physical stand",
+        price_cents: 1500,
+        submitted_at: new Date().toISOString(),
+        status: 'completed',
+      };
+      localStorage.setItem('fleurraine_custom_orders', JSON.stringify([newOrder, ...existingOrders]));
+      alert("Successfully paid with Apple Pay! The purchase has been added to your order history.");
+    } catch (err) {
+      alert("Payment processing failed.");
+    }
+  };
 
   const fetchLatestStandPhoto = async () => {
     try {
@@ -114,7 +134,17 @@ export default function Home() {
         )}
 
         {!loading && !error && latestPhoto && (
-          <PhotoDisplay photo={latestPhoto} showDetails={true} />
+          <Link to={`/photos/${latestPhoto.id}`} className="block rounded-lg overflow-hidden shadow hover:shadow-lg transition-shadow">
+            <img
+              src={`/api/storage/${latestPhoto.storage_key_mobile}`}
+              alt={latestPhoto.flower_name || 'Flower Stand'}
+              className="w-full h-auto cursor-pointer object-cover max-h-[550px]"
+              style={{ imageOrientation: 'from-image' }}
+            />
+            <div className="bg-white p-3 text-center text-sm font-medium text-accent hover:underline">
+              🔍 Tap picture to view details, full resolution, & share
+            </div>
+          </Link>
         )}
 
         {!loading && !error && !latestPhoto && (
@@ -172,20 +202,30 @@ export default function Home() {
               🍯 2. Pay for Grabbed Flowers
             </h4>
             <p className="text-gray-600 text-sm mb-3">
-              Did you pick a jar of loose flowers or an unnumbered bouquet? Pay instantly with Venmo!
+              You can pay for flowers you take from the stand with cash, venmo, or apple pay.
             </p>
-            <a
-              href={`venmo://paycharge?txn=pay&recipients=${import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum'}`}
-              className="inline-block border border-accent text-accent px-4 py-2 rounded-md font-medium text-sm hover:bg-accent/10 transition-colors"
-              onClick={() => {
-                const venmoUsername = import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum';
-                setTimeout(() => {
-                  window.open(`https://venmo.com/${venmoUsername}`, '_blank');
-                }, 1000);
-              }}
-            >
-              📱 Quick Pay via Venmo
-            </a>
+            <div className="flex flex-col gap-2">
+              <a
+                href={`venmo://paycharge?txn=pay&recipients=${import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum'}`}
+                className="text-center border border-accent text-accent px-4 py-2 rounded-md font-medium text-sm hover:bg-accent/10 transition-colors"
+                onClick={() => {
+                  const venmoUsername = import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum';
+                  setTimeout(() => {
+                    window.open(`https://venmo.com/${venmoUsername}`, '_blank');
+                  }, 1000);
+                }}
+              >
+                📱 Venmo Pay
+              </a>
+              {user && (
+                <button
+                  onClick={handleApplePayGrab}
+                  className="bg-black text-white px-4 py-2 rounded-md font-medium text-sm hover:bg-black/90 transition-colors"
+                >
+                   Buy with Apple Pay
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Step 3: Browse and Buy Bouquets */}

@@ -90,7 +90,7 @@ export default function BouquetDetail() {
 
   const handleVenmo = () => {
     if (!bouquet) return;
-    
+     
     const venmoUsername = import.meta.env.VITE_VENMO_USERNAME || 'LorraineSHellum';
     const note = `Bouquet #${bouquet.bouquet_number}`;
     const amount = (bouquet.price_cents / 100).toFixed(2);
@@ -258,41 +258,37 @@ export default function BouquetDetail() {
 
       {/* Action buttons */}
       <div className="space-y-3">
-        {/* Apple Pay button */}
-        <button
-          onClick={handleApplePay}
-          disabled={purchasing || !!bouquet.purchased_by}
-          className={`w-full text-white py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2 ${
-            bouquet.purchased_by
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-black hover:bg-gray-800'
-          }`}
-        >
-          {purchasing ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          ) : (
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-            </svg>
-          )}
-          {bouquet.purchased_by ? 'Sold Out' : 'Buy with Apple Pay'}
-        </button>
+        {/* Purchase options only show when available */}
+        {!bouquet.purchased_by && (
+          <>
+            {/* Apple Pay button */}
+            <button
+              onClick={handleApplePay}
+              disabled={purchasing}
+              className="w-full text-white py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2 bg-black hover:bg-gray-800"
+            >
+              {purchasing ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                </svg>
+              )}
+              Buy with Apple Pay
+            </button>
 
-        {/* Venmo button */}
-        <button
-          onClick={handleVenmo}
-          disabled={!!bouquet.purchased_by}
-          className={`w-full text-white py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2 ${
-            bouquet.purchased_by
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-[#008CFF] hover:bg-[#0074D9]'
-          }`}
-        >
-          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M19.83 4.18c.93 1.31 1.36 2.87 1.36 4.72 0 5.88-5.03 13.51-9.16 13.51-1.67 0-3.08-1.09-3.08-3.18 0-.46.06-.98.19-1.56l1.43-7.54-3.23-.01L8.01 7.8h3.23l.34-1.78c.58-3.02 2.57-5.02 5.66-5.02.93 0 1.81.13 2.59.38l-.82 3.02c-.52-.19-1.04-.29-1.56-.29-1.31 0-2.12.73-2.47 2.18l-.26 1.51h3.23l-.52 2.72h-3.23l-1.43 7.54c-.06.31-.09.58-.09.79 0 .58.31.88.79.88 1.67 0 4.72-4.72 4.72-9.44 0-1.31-.29-2.39-.88-3.23l1.49-1.9z"/>
-          </svg>
-          {bouquet.purchased_by ? 'Sold Out' : 'Pay with Venmo'}
-        </button>
+            {/* Venmo button */}
+            <button
+              onClick={handleVenmo}
+              className="w-full text-white py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2 bg-[#008CFF] hover:bg-[#0074D9]"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19.83 4.18c.93 1.31 1.36 2.87 1.36 4.72 0 5.88-5.03 13.51-9.16 13.51-1.67 0-3.08-1.09-3.08-3.18 0-.46.06-.98.19-1.56l1.43-7.54-3.23-.01L8.01 7.8h3.23l.34-1.78c.58-3.02 2.57-5.02 5.66-5.02.93 0 1.81.13 2.59.38l-.82 3.02c-.52-.19-1.04-.29-1.56-.29-1.31 0-2.12.73-2.47 2.18l-.26 1.51h3.23l-.52 2.72h-3.23l-1.43 7.54c-.06.31-.09.58-.09.79 0 .58.31.88.79.88 1.67 0 4.72-4.72 4.72-9.44 0-1.31-.29-2.39-.88-3.23l1.49-1.9z"/>
+              </svg>
+              Pay with Venmo
+            </button>
+          </>
+        )}
 
         {/* Share button */}
         <button
