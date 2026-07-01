@@ -134,24 +134,36 @@ export default function Home() {
         )}
 
         {!loading && !error && latestPhoto && (
-          <Link to={`/photos/${latestPhoto.id}`} className="block rounded-lg overflow-hidden shadow hover:shadow-lg transition-shadow">
-            <img
-              src={`/api/storage/${latestPhoto.storage_key_mobile}`}
-              alt={latestPhoto.flower_name || 'Flower Stand'}
-              className="w-full h-auto cursor-pointer object-cover max-h-[550px]"
-              style={{ imageOrientation: 'from-image' }}
-            />
-            <div className="bg-white p-3 text-center text-sm font-medium text-accent hover:underline">
-              🔍 Tap picture to view details, full resolution, & share
+          <div className="space-y-4">
+            <Link to={`/photos/${latestPhoto.id}`} className="block rounded-lg overflow-hidden shadow hover:shadow-lg transition-shadow">
+              <img
+                src={`/api/storage/${latestPhoto.storage_key_mobile}`}
+                alt={latestPhoto.flower_name || 'Flower Stand'}
+                className="w-full h-auto cursor-pointer object-cover max-h-[550px]"
+                style={{ imageOrientation: 'from-image' }}
+              />
+              <div className="bg-white p-3 text-center text-sm font-medium text-accent hover:underline">
+                🔍 Tap picture to view details, full resolution, & share
+              </div>
+            </Link>
+            <div className="text-center">
+              <Link to="/stand/history" className="text-sm font-semibold text-accent hover:underline inline-flex items-center gap-1">
+                📅 View Flower Stand History / Past Offerings →
+              </Link>
             </div>
-          </Link>
+          </div>
         )}
 
         {!loading && !error && !latestPhoto && (
-          <div className="bg-gray-50 rounded-lg shadow p-8 text-center">
+          <div className="bg-gray-50 rounded-lg shadow p-8 text-center space-y-4">
             <p className="text-gray-600">
               No flower stand photo available yet. Check back soon!
             </p>
+            <div>
+              <Link to="/stand/history" className="text-sm font-semibold text-accent hover:underline inline-flex items-center gap-1">
+                📅 View Flower Stand History / Past Offerings →
+              </Link>
+            </div>
           </div>
         )}
       </section>

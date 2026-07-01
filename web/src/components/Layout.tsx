@@ -6,6 +6,7 @@ import { isDevEnvironment } from "../lib/env";
 
 const basePublicLinks = [
   { to: "/", label: "Home", icon: "🏠" },
+  { to: "/stand/history", label: "History", icon: "📅" },
   { to: "/flowers", label: "Flowers", icon: "🌸" },
   { to: "/garden", label: "Garden", icon: "🌿" },
 ];
