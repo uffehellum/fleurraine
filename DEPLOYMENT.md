@@ -41,7 +41,7 @@ This automatically sets the dev-specific `DATABASE_URL` secret.
 ```bash
 # Create dev Tigris storage and configure secret mapping
 fly secrets set -a fleurraine-dev \
-  TIGRIS_BUCKET="fleurraine-bucket-dev" \
+  TIGRIS_BUCKET="fleurraine-dev" \
   TIGRIS_ACCESS_KEY_ID="<DEV_ACCESS_KEY_ID>" \
   TIGRIS_SECRET_ACCESS_KEY="<DEV_SECRET_ACCESS_KEY>" \
   TIGRIS_ENDPOINT_URL="https://fly.storage.tigris.dev"
@@ -282,6 +282,25 @@ Or visit: https://fly.io/apps/fleurraine
 ---
 
 ## Troubleshooting
+
+### Deployment "Unauthorized" Error
+
+If your GitHub Action or manual deploy fails with `Error: unauthorized (Request ID: ...)`:
+
+1. **Verify the App Exists on Fly.io:**
+   Ensure you have actually created the `fleurraine-dev` app on Fly.io before attempting to deploy to it.
+   ```bash
+   fly apps list
+   ```
+   If it is not in the list, run:
+   ```bash
+   fly apps create fleurraine-dev
+   ```
+
+2. **Verify/Regenerate your Deployment Token:**
+   The `FLY_API_TOKEN` secret in your GitHub repository might be outdated, incorrect, or doesn't have access to the app's organization.
+   - Run `fly tokens create deploy --app fleurraine-dev` (or `--app fleurraine`) to generate a token scoped specifically to that app.
+   - Update `FLY_API_TOKEN` in **GitHub Repository Settings** -> **Secrets and variables** -> **Actions** with the newly generated token.
 
 ### App Won't Start
 
