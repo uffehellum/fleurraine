@@ -70,7 +70,21 @@ Automated deployments are handled via GitHub Actions:
 1. Every time a **Pull Request (merge request)** is opened or updated, the GitHub workflow automatically builds and deploys to `fleurraine-dev`.
 2. When changes are merged into the **`main` branch**, the workflow deploys the changes to the production app `fleurraine`.
 
-Make sure to add your `FLY_API_TOKEN` to your GitHub Repository Secrets as `FLY_API_TOKEN` so the actions can authenticate with Fly.io.
+For GitHub Actions to be able to authenticate and deploy to Fly.io, you **must configure your repository secrets**:
+
+1. **Generate a Fly.io Deploy Token:**
+   Run the following command in your terminal to generate a token:
+   ```bash
+   fly tokens create deploy
+   ```
+   *(Alternatively, log in to your [Fly.io Dashboard](https://fly.io/), navigate to your account settings, go to the **Access Tokens** section, and create a new token.)*
+
+2. **Add the Secret to GitHub:**
+   - Go to your repository on GitHub.
+   - Navigate to **Settings** -> **Secrets and variables** -> **Actions**.
+   - Click the **New repository secret** button.
+   - Set the name to: `FLY_API_TOKEN`
+   - Paste the generated token into the Value field and click **Add secret**.
 
 ---
 
