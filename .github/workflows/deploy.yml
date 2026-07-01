@@ -1,0 +1,35 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  deploy:
+    name: Deploy App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Deploy to Dev environment on Pull Request
+      - name: Deploy to Fleurraine Dev (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          flyctl deploy --app fleurraine-dev --build-arg VITE_APP_ENV=development
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Deploy to Production on Push to Main (Merge)
+      - name: Deploy to Fleurraine Prod (Main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          flyctl deploy --app fleurraine --build-arg VITE_APP_ENV=production
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

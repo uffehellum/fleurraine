@@ -2,6 +2,7 @@ import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect } from "react";
 import PullToRefresh from "./PullToRefresh";
+import { isDevEnvironment } from "../lib/env";
 
 const basePublicLinks = [
   { to: "/", label: "Home", icon: "🏠" },
@@ -23,6 +24,11 @@ export default function Layout() {
 
   useEffect(() => {
     fetchBouquetAvailability();
+    
+    // Set development background if running in dev
+    if (isDevEnvironment()) {
+      document.documentElement.style.setProperty('--color-bg', '#FFF0F5'); // Light pink/lavenderblush
+    }
   }, []);
 
   const fetchBouquetAvailability = async () => {
@@ -49,9 +55,14 @@ export default function Layout() {
           <div className="flex items-center justify-between">
             <Link
               to="/"
-              className="font-heading text-xl tracking-wide text-accent"
+              className="font-heading text-xl tracking-wide text-accent flex items-center gap-2"
             >
               Fleurraine
+              {isDevEnvironment() && (
+                <span className="bg-pink-100 text-pink-700 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border border-pink-200 font-sans uppercase">
+                  DEV
+                </span>
+              )}
             </Link>
 
             {/* Mobile menu button */}

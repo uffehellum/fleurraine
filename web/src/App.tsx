@@ -3,7 +3,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
-import { InstallPrompt } from "./components/InstallPrompt";
 import Home from "./pages/Home";
 import StandHistory from "./pages/StandHistory";
 import Flowers from "./pages/Flowers";
@@ -26,7 +25,6 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <InstallPrompt />
         <Routes>
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route element={<Layout />}>
