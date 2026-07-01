@@ -760,7 +760,7 @@ func (s *Service) ListPhotos(ctx context.Context, category, status string, limit
 		argNum++
 	}
 
-	query += " ORDER BY p.uploaded_at DESC"
+	query += " ORDER BY COALESCE(p.exif_taken_at, p.uploaded_at) DESC"
 
 	if limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", argNum)

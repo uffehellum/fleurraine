@@ -73,11 +73,12 @@ Automated deployments are handled via GitHub Actions:
 For GitHub Actions to be able to authenticate and deploy to Fly.io, you **must configure your repository secrets**:
 
 1. **Generate a Fly.io Deploy Token:**
-   Run the following command in your terminal to generate a token:
+   Since our GitHub Action deploys to two separate apps (`fleurraine` and `fleurraine-dev`), a standard app-scoped deploy token will fail on one of the apps with an `unauthorized` error. You must generate an **organization-level deploy token** (an "org token"):
    ```bash
-   fly tokens create deploy
+   # Generates a deploy token for your default personal organization
+   fly tokens create org -o personal
    ```
-   *(Alternatively, log in to your [Fly.io Dashboard](https://fly.io/), navigate to your account settings, go to the **Access Tokens** section, and create a new token.)*
+   *(If you are deploying under a specific custom Fly organization instead of your personal account, replace `personal` with your organization's slug name, e.g. `fly tokens create org -o custom-org-name`.)*
 
 2. **Add the Secret to GitHub:**
    - Go to your repository on GitHub.
@@ -298,9 +299,12 @@ If your GitHub Action or manual deploy fails with `Error: unauthorized (Request 
    ```
 
 2. **Verify/Regenerate your Deployment Token:**
-   The `FLY_API_TOKEN` secret in your GitHub repository might be outdated, incorrect, or doesn't have access to the app's organization.
-   - Run `fly tokens create deploy --app fleurraine-dev` (or `--app fleurraine`) to generate a token scoped specifically to that app.
-   - Update `FLY_API_TOKEN` in **GitHub Repository Settings** -> **Secrets and variables** -> **Actions** with the newly generated token.
+   The `FLY_API_TOKEN` secret in your GitHub repository might be outdated, incorrect, or scoped only to a single app (which causes `unauthorized` errors when deploying the other app).
+   - Ensure you generate an **organization-scoped** deploy token ("org token") so it can deploy both apps:
+     ```bash
+     fly tokens create org -o personal
+     ```
+   - Update `FLY_API_TOKEN` in **GitHub Repository Settings** -> **Secrets and variables** -> **Actions** with this organization-level token.
 
 ### App Won't Start
 
