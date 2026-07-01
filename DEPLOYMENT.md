@@ -21,6 +21,73 @@ View logs: `fly logs -a fleurraine`
 
 ---
 
+## Dev Environment Setup (`fleurraine-dev`)
+
+To configure and launch a completely isolated development environment that mirrors production but keeps your databases and image buckets separated:
+
+### 1. Create Dev App
+```bash
+fly apps create fleurraine-dev
+```
+
+### 2. Create Dev Database
+```bash
+fly postgres create --name fleurraine-db-dev --region sjc
+fly postgres attach fleurraine-db-dev -a fleurraine-dev
+```
+This automatically sets the dev-specific `DATABASE_URL` secret.
+
+### 3. Create Dev S3-Compatible Storage (Tigris Bucket)
+```bash
+# Create dev Tigris storage and configure secret mapping
+fly secrets set -a fleurraine-dev \
+  TIGRIS_BUCKET="fleurraine-dev" \
+  TIGRIS_ACCESS_KEY_ID="<DEV_ACCESS_KEY_ID>" \
+  TIGRIS_SECRET_ACCESS_KEY="<DEV_SECRET_ACCESS_KEY>" \
+  TIGRIS_ENDPOINT_URL="https://fly.storage.tigris.dev"
+```
+
+### 4. Configure Auth Redirects (Google & Facebook)
+Google and Facebook OAuth redirects are calculated dynamically using the active `window.location.origin`. Since both use the same credentials but separate redirects, simply add the following URLs to your existing Google and Facebook developer consoles:
+
+- **Google Developer Console (Authorized redirect URIs):**
+  - `https://fleurraine-dev.fly.dev/auth/callback?provider=google`
+- **Facebook Login (Valid OAuth Redirect URIs):**
+  - `https://fleurraine-dev.fly.dev/auth/callback?provider=facebook`
+
+Set the secrets for `fleurraine-dev` with the exact same credential IDs:
+```bash
+fly secrets set -a fleurraine-dev \
+  GOOGLE_CLIENT_ID="..." \
+  GOOGLE_CLIENT_SECRET="..." \
+  FACEBOOK_APP_ID="..." \
+  FACEBOOK_APP_SECRET="..." \
+  ALLOWED_ORIGINS="https://fleurraine-dev.fly.dev"
+```
+
+### 5. Automated Deployments (CI/CD)
+Automated deployments are handled via GitHub Actions:
+1. Every time a **Pull Request (merge request)** is opened or updated, the GitHub workflow automatically builds and deploys to `fleurraine-dev`.
+2. When changes are merged into the **`main` branch**, the workflow deploys the changes to the production app `fleurraine`.
+
+For GitHub Actions to be able to authenticate and deploy to Fly.io, you **must configure your repository secrets**:
+
+1. **Generate a Fly.io Deploy Token:**
+   Run the following command in your terminal to generate a token:
+   ```bash
+   fly tokens create deploy
+   ```
+   *(Alternatively, log in to your [Fly.io Dashboard](https://fly.io/), navigate to your account settings, go to the **Access Tokens** section, and create a new token.)*
+
+2. **Add the Secret to GitHub:**
+   - Go to your repository on GitHub.
+   - Navigate to **Settings** -> **Secrets and variables** -> **Actions**.
+   - Click the **New repository secret** button.
+   - Set the name to: `FLY_API_TOKEN`
+   - Paste the generated token into the Value field and click **Add secret**.
+
+---
+
 ## First-Time Setup
 
 ### 1. Install Fly CLI
@@ -215,6 +282,25 @@ Or visit: https://fly.io/apps/fleurraine
 ---
 
 ## Troubleshooting
+
+### Deployment "Unauthorized" Error
+
+If your GitHub Action or manual deploy fails with `Error: unauthorized (Request ID: ...)`:
+
+1. **Verify the App Exists on Fly.io:**
+   Ensure you have actually created the `fleurraine-dev` app on Fly.io before attempting to deploy to it.
+   ```bash
+   fly apps list
+   ```
+   If it is not in the list, run:
+   ```bash
+   fly apps create fleurraine-dev
+   ```
+
+2. **Verify/Regenerate your Deployment Token:**
+   The `FLY_API_TOKEN` secret in your GitHub repository might be outdated, incorrect, or doesn't have access to the app's organization.
+   - Run `fly tokens create deploy --app fleurraine-dev` (or `--app fleurraine`) to generate a token scoped specifically to that app.
+   - Update `FLY_API_TOKEN` in **GitHub Repository Settings** -> **Secrets and variables** -> **Actions** with the newly generated token.
 
 ### App Won't Start
 

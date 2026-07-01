@@ -661,6 +661,22 @@ export default function PhotoDetail() {
                   })}
                 </span>
               </div>
+
+              {(photo.uploaded_by_name || photo.uploaded_by_email) && (
+                <div className="flex justify-between">
+                  <span>Uploaded By:</span>
+                  <span className="font-medium text-gray-900">
+                    {photo.uploaded_by_name || photo.uploaded_by_email}
+                  </span>
+                </div>
+              )}
+
+              {photo.uploaded_by && (
+                <div className="flex justify-between">
+                  <span>Uploader ID:</span>
+                  <span className="font-mono text-xs text-gray-500">{photo.uploaded_by}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

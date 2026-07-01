@@ -14,6 +14,8 @@ interface Photo {
   exif_taken_at?: string;
   uploaded_at: string;
   uploaded_by: string;
+  uploaded_by_email?: string;
+  uploaded_by_name?: string;
   is_review: boolean;
   review_approved?: boolean;
   camera_model?: string;
@@ -439,7 +441,7 @@ export default function AdminPhotos() {
                         </div>
                       )}
                       <div className="text-gray-600 text-xs">
-                        👤 Uploader ID: {photo.uploaded_by.substring(0, 8)}...
+                        👤 Uploader: {photo.uploaded_by_name || photo.uploaded_by_email || photo.uploaded_by.substring(0, 8) + '...'}
                       </div>
                     </div>
                   </div>
@@ -530,6 +532,18 @@ export default function AdminPhotos() {
                             })}
                           </p>
                         </div>
+                        {photo.uploaded_by_name && (
+                          <div>
+                            <span className="text-gray-600">Uploader Name:</span>
+                            <p className="text-gray-900">{photo.uploaded_by_name}</p>
+                          </div>
+                        )}
+                        {photo.uploaded_by_email && (
+                          <div>
+                            <span className="text-gray-600">Uploader Email:</span>
+                            <p className="text-gray-900">{photo.uploaded_by_email}</p>
+                          </div>
+                        )}
                         <div>
                           <span className="text-gray-600">Uploader ID:</span>
                           <p className="text-gray-900 font-mono text-xs break-all">{photo.uploaded_by}</p>
