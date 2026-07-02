@@ -636,7 +636,7 @@ func (s *Service) GetLatestStandPhoto(ctx context.Context) (*Photo, error) {
 		       flower_name, description, uploaded_by, uploaded_at, published_at, share_token
 		FROM photos
 		WHERE category = 'stand' AND status = 'published'
-		ORDER BY COALESCE(exif_taken_at, uploaded_at) DESC
+		ORDER BY exif_taken_at DESC NULLS LAST, uploaded_at DESC
 		LIMIT 1
 	`
 
@@ -760,7 +760,7 @@ func (s *Service) ListPhotos(ctx context.Context, category, status string, limit
 		argNum++
 	}
 
-	query += " ORDER BY p.uploaded_at DESC"
+	query += " ORDER BY p.exif_taken_at DESC NULLS LAST, p.uploaded_at DESC"
 
 	if limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", argNum)
