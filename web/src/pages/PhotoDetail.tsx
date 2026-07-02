@@ -37,8 +37,6 @@ interface Photo {
   harvest_season?: string;
   row_number?: number;
   photo_edits?: Record<string, any>;
-  bouquet_number?: number;
-  price_cents?: number;
   row_numbers?: number[];
   flower_names?: string[];
 }
@@ -56,8 +54,6 @@ export default function PhotoDetail() {
   const [editMode, setEditMode] = useState(false);
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
-  const [bouquetNumber, setBouquetNumber] = useState<number | ''>('');
-  const [price, setPrice] = useState<string>('');
   const [flowerNamesStr, setFlowerNamesStr] = useState('');
   const [rowNumbersStr, setRowNumbersStr] = useState('');
   const [saving, setSaving] = useState(false);
@@ -87,8 +83,6 @@ export default function PhotoDetail() {
       // Initialize edit states
       setCategory(data.category || 'other');
       setDescription(data.description || '');
-      setBouquetNumber(data.bouquet_number ?? '');
-      setPrice(data.price_cents ? (data.price_cents / 100).toFixed(2) : '');
       setFlowerNamesStr(data.flower_names ? data.flower_names.join(', ') : (data.flower_name ? data.flower_name : ''));
       setRowNumbersStr(data.row_numbers ? data.row_numbers.join(', ') : (data.row_number ? String(data.row_number) : ''));
     } catch (err) {
@@ -157,9 +151,6 @@ export default function PhotoDetail() {
         .map((r) => parseInt(r.trim(), 10))
         .filter((r) => !isNaN(r));
 
-      // Parse price cents
-      const priceCents = price ? Math.round(parseFloat(price) * 100) : null;
-
       const response = await fetch(`/api/photos/${photo.id}/metadata`, {
         method: 'PUT',
         credentials: 'include',
@@ -168,8 +159,6 @@ export default function PhotoDetail() {
         },
         body: JSON.stringify({
           category,
-          bouquet_number: bouquetNumber === '' ? null : Number(bouquetNumber),
-          price_cents: priceCents,
           flower_names: flowerNames,
           row_numbers: rowNumbers,
           description,
@@ -281,15 +270,6 @@ export default function PhotoDetail() {
           </>
         )}
 
-        {photo.category === 'bouquet' && (
-          <Link
-            to="/bouquets"
-            className="text-green-700 hover:underline bg-green-50 px-2 py-0.5 rounded border border-green-200"
-          >
-            💐 Bouquet Gallery
-          </Link>
-        )}
-
         {photo.category === 'stand' && (
           <Link
             to="/stand-history"
@@ -303,7 +283,7 @@ export default function PhotoDetail() {
       {/* Action Bar */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-heading text-2xl truncate">
-          {photo.category === 'bouquet' && photo.bouquet_number ? `Bouquet #${photo.bouquet_number}` : (photo.flower_name || 'Photo Details')}
+          {photo.flower_name || 'Photo Details'}
         </h1>
         
         <div className="flex gap-2">
@@ -406,38 +386,11 @@ export default function PhotoDetail() {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
                   >
                     <option value="stand">Stand</option>
-                    <option value="bouquet">Bouquet</option>
                     <option value="flower_type">Flower Type</option>
                     <option value="garden_row">Garden Row</option>
                     <option value="other">Other</option>
                   </select>
                 </div>
-
-                {category === 'bouquet' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Bouquet # (Sticker)</label>
-                      <input
-                        type="number"
-                        value={bouquetNumber}
-                        onChange={(e) => setBouquetNumber(e.target.value === '' ? '' : Number(e.target.value))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                        placeholder="e.g. 1024"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Price ($ USD)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                        placeholder="e.g. 15.00"
-                      />
-                    </div>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Flower Name(s)</label>
@@ -511,21 +464,6 @@ export default function PhotoDetail() {
                     {photo.status}
                   </span>
                 </div>
-
-                {photo.category === 'bouquet' && photo.bouquet_number && (
-                  <div className="grid grid-cols-2 gap-4 bg-green-50/50 p-3 rounded-lg border border-green-100">
-                    <div>
-                      <span className="text-xs text-gray-500 block uppercase tracking-wider">Bouquet #</span>
-                      <span className="font-bold text-xl text-gray-900">#{photo.bouquet_number}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-500 block uppercase tracking-wider">Price</span>
-                      <span className="font-bold text-xl text-green-700">
-                        ${photo.price_cents ? (photo.price_cents / 100).toFixed(2) : '15.00'}
-                      </span>
-                    </div>
-                  </div>
-                )}
 
                 {photo.flower_names && photo.flower_names.length > 0 ? (
                   <div>

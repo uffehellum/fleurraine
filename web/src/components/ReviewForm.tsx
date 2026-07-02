@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ReviewFormProps {
@@ -13,6 +13,16 @@ export default function ReviewForm({ onSuccess, onCancel }: ReviewFormProps) {
   const [daysSincePurchase, setDaysSincePurchase] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Synchronous click handler — iOS PWA requires input.click() to happen
+  // directly within a user gesture, with no async/await before it.
+  const handleUploadClick = () => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.value = '';
+    input.click();
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -21,6 +31,8 @@ export default function ReviewForm({ onSuccess, onCancel }: ReviewFormProps) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
     }
+    // Reset so the same file can be selected again
+    e.target.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,25 +177,32 @@ export default function ReviewForm({ onSuccess, onCancel }: ReviewFormProps) {
               </button>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer hover:bg-gray-50">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <svg className="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <p className="mb-2 text-sm text-gray-500">
-                  <span className="font-semibold">Click to upload</span> or drag and drop
-                </p>
-                <p className="text-xs text-gray-500">PNG, JPG, HEIC up to 10MB</p>
-              </div>
+            <div className="w-full">
               <input
+                ref={fileInputRef}
                 type="file"
                 className="hidden"
                 accept="image/*"
                 onChange={handleFileSelect}
               />
-            </label>
+              <button
+                type="button"
+                onClick={handleUploadClick}
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg hover:bg-gray-50"
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg className="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <p className="mb-2 text-sm text-gray-500">
+                    <span className="font-semibold">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="text-xs text-gray-500">PNG, JPG, HEIC up to 10MB</p>
+                </div>
+              </button>
+            </div>
           )}
           <p className="text-xs text-gray-500 mt-1">
             Share a photo of your Fleurraine flowers! Only photos of fresh-cut flowers will be accepted.

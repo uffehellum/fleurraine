@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
@@ -7,8 +8,6 @@ import Flowers from './pages/Flowers';
 import FlowerDetail from './pages/FlowerDetail';
 import Garden from './pages/Garden';
 import GardenRow from './pages/GardenRow';
-import Bouquets from './pages/Bouquets';
-import BouquetDetail from './pages/BouquetDetail';
 import Orders from './pages/Orders';
 import StandHistory from './pages/StandHistory';
 import Subscribe from './pages/Subscribe';
@@ -28,14 +27,13 @@ import Season from './pages/Season';
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <AuthProvider>
+        <Routes>
         <Route path="/" element={<Layout><Home /></Layout>} />
         <Route path="/flowers" element={<Layout><Flowers /></Layout>} />
         <Route path="/flowers/:id" element={<Layout><FlowerDetail /></Layout>} />
         <Route path="/garden" element={<Layout><Garden /></Layout>} />
         <Route path="/garden/:id" element={<Layout><GardenRow /></Layout>} />
-        <Route path="/bouquets" element={<Layout><Bouquets /></Layout>} />
-        <Route path="/bouquets/:id" element={<Layout><BouquetDetail /></Layout>} />
         <Route path="/orders" element={<ProtectedRoute><Layout><Orders /></Layout></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><Layout><StandHistory /></Layout></ProtectedRoute>} />
         <Route path="/subscribe" element={<Layout><Subscribe /></Layout>} />
@@ -51,7 +49,8 @@ export default function App() {
         <Route path="/admin/queue" element={<AdminRoute><Layout><AdminQueue /></Layout></AdminRoute>} />
         <Route path="/admin/analytics" element={<AdminRoute><Layout><AdminAnalytics /></Layout></AdminRoute>} />
         <Route path="/admin/orders" element={<AdminRoute><Layout><AdminOrders /></Layout></AdminRoute>} />
-      </Routes>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

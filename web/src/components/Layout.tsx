@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
+import PullToRefresh from './PullToRefresh';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, signOut, isAdmin } = useAuth();
@@ -17,7 +18,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/', label: 'Home' },
     { to: '/flowers', label: 'Flowers' },
     { to: '/garden', label: 'Garden' },
-    { to: '/bouquets', label: 'Bouquets' },
     { to: '/orders', label: 'Orders' },
     { to: '/bio', label: 'Bio' },
     { to: '/subscribe', label: 'Subscribe' },
@@ -34,7 +34,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-2xl font-serif text-rose-900">Fleur Raine</span>
+              <span className="text-2xl font-serif text-rose-900">Fleurraine</span>
             </Link>
 
             {/* Desktop nav */}
@@ -149,11 +149,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <PullToRefresh>{children}</PullToRefresh>
+      </main>
 
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-6xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
-          <p>Fleur Raine — Fresh flowers from the garden</p>
+          <p>Fleurraine — Fresh flowers from the garden</p>
         </div>
       </footer>
     </div>

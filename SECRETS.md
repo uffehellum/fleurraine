@@ -70,9 +70,57 @@ These are embedded in the frontend build and are **public** (visible in browser)
 
 ---
 
-## Production (Fly.io)
+## Deployment Flows
 
-### Set Secrets
+Fleurraine has two Fly.io apps:
+- **`fleurraine-dev`** — dev/staging environment (deploys on every PR)
+- **`fleurraine`** — production environment (deploys on merge to `main`)
+
+### Manual Deployment (Dev)
+
+To deploy manually to the dev app:
+
+```bash
+fly deploy -a fleurraine-dev
+```
+
+Secrets for the dev app are set separately:
+
+```bash
+fly secrets set -a fleurraine-dev \
+  ADMIN_EMAILS="lorraine@example.com" \
+  ADMIN_EMAIL="lorraine@example.com" \
+  GOOGLE_CLIENT_ID="..." \
+  GOOGLE_CLIENT_SECRET="..." \
+  ANTHROPIC_API_KEY="..." \
+  RESEND_API_KEY="..." \
+  ALLOWED_ORIGINS="https://fleurraine-dev.fly.dev" \
+  SESSION_SECRET="$(openssl rand -hex 32)" \
+  STRIPE_SECRET_KEY="sk_test_..." \
+  STRIPE_WEBHOOK_SECRET="whsec_..." \
+  SALES_TAX_RATE="0.09" \
+  SALES_TAX_LABEL="Camano Island Sales Tax (9%)" \
+  APP_URL="https://fleurraine-dev.fly.dev"
+```
+
+### GitHub Actions Deployment
+
+The workflow in `.github/workflows/deploy.yml` automates deployments:
+
+- **Pull Request opened/synced** → deploys to `fleurraine-dev` with `VITE_APP_ENV=development`
+- **Push to `main`** (merge) → deploys to `fleurraine` (production) with `VITE_APP_ENV=production`
+
+The only GitHub secret required is:
+
+| GitHub Secret | Description |
+|---------------|-------------|
+| `FLY_API_TOKEN` | Fly.io API token for deploying (generate at https://fly.io/app/personal-access-tokens) |
+
+**Important:** GitHub Actions does NOT set application secrets. All app-level secrets (database, OAuth, Stripe, etc.) must be pre-set on each Fly app via `fly secrets set`. The workflow only runs `flyctl deploy` — it does not pass secrets.
+
+### Production Secrets
+
+Set secrets on the production app:
 
 ```bash
 fly secrets set -a fleurraine \
@@ -85,25 +133,33 @@ fly secrets set -a fleurraine \
   ANTHROPIC_API_KEY="..." \
   RESEND_API_KEY="..." \
   ALLOWED_ORIGINS="https://fleurraine.fly.dev" \
-  SESSION_SECRET="$(openssl rand -hex 32)"
+  SESSION_SECRET="$(openssl rand -hex 32)" \
+  STRIPE_SECRET_KEY="sk_live_..." \
+  STRIPE_WEBHOOK_SECRET="whsec_..." \
+  SALES_TAX_RATE="0.09" \
+  SALES_TAX_LABEL="Camano Island Sales Tax (9%)" \
+  APP_URL="https://fleurraine.fly.dev"
 ```
 
 ### List Secrets
 
 ```bash
 fly secrets list -a fleurraine
+fly secrets list -a fleurraine-dev
 ```
 
 ### Update a Secret
 
 ```bash
 fly secrets set -a fleurraine KEY="new-value"
+fly secrets set -a fleurraine-dev KEY="new-value"
 ```
 
 ### Remove a Secret
 
 ```bash
 fly secrets unset -a fleurraine KEY
+fly secrets unset -a fleurraine-dev KEY
 ```
 
 ---
@@ -170,7 +226,56 @@ fly secrets set -a fleurraine \
 
 ```bash
 fly secrets set -a fleurraine ANTHROPIC_API_KEY="sk-ant-api03-..."
+fly secrets set -a fleurraine-dev ANTHROPIC_API_KEY="sk-ant-api03-..."
 ```
+
+---
+
+## Stripe Payments
+
+### Get API Keys
+
+1. Sign up at [Stripe Dashboard](https://dashboard.stripe.com)
+2. Get your API keys from Developers → API keys:
+   - **Test mode**: `sk_test_...` (for dev)
+   - **Live mode**: `sk_live_...` (for production)
+3. Set the secret:
+
+```bash
+# Dev (test mode)
+fly secrets set -a fleurraine-dev STRIPE_SECRET_KEY="sk_test_..."
+
+# Production (live mode)
+fly secrets set -a fleurraine STRIPE_SECRET_KEY="sk_live_..."
+```
+
+### Webhook Signing Secret
+
+1. Go to Stripe Dashboard → Developers → Webhooks → Add endpoint
+2. Set the endpoint URL:
+   - Dev: `https://fleurraine-dev.fly.dev/api/payments/webhook`
+   - Prod: `https://fleurraine.fly.dev/api/payments/webhook`
+3. Select the `checkout.session.completed` event
+4. Copy the signing secret (`whsec_...`) from the endpoint detail page
+5. Set it:
+
+```bash
+fly secrets set -a fleurraine-dev STRIPE_WEBHOOK_SECRET="whsec_..."
+fly secrets set -a fleurraine STRIPE_WEBHOOK_SECRET="whsec_..."
+```
+
+### Sales Tax
+
+The app applies a fixed sales tax rate (default 9% for Camano Island):
+
+```bash
+fly secrets set -a fleurraine-dev SALES_TAX_RATE="0.09" SALES_TAX_LABEL="Camano Island Sales Tax (9%)"
+fly secrets set -a fleurraine SALES_TAX_RATE="0.09" SALES_TAX_LABEL="Camano Island Sales Tax (9%)"
+```
+
+### Apple Pay
+
+Stripe Checkout automatically shows Apple Pay as the first payment option on iPhone Safari. No code changes needed — just enable Apple Pay in your Stripe Dashboard settings and verify your domain.
 
 ---
 
@@ -184,6 +289,7 @@ fly secrets set -a fleurraine ANTHROPIC_API_KEY="sk-ant-api03-..."
 
 ```bash
 fly secrets set -a fleurraine RESEND_API_KEY="re_..."
+fly secrets set -a fleurraine-dev RESEND_API_KEY="re_..."
 ```
 
 ---

@@ -3,18 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import ReviewForm from '../components/ReviewForm';
 
-interface PurchasedBouquet {
-  id: string;
-  bouquet_number: number;
-  price_cents: number;
-  storage_key_mobile: string;
-  storage_key_thumb: string;
-  description?: string;
-  uploaded_at: string;
-  sold_at?: string;
-  purchased_by?: string;
-}
-
 interface CustomOrder {
   id: string;
   description: string;
@@ -26,14 +14,13 @@ interface CustomOrder {
 export default function Orders() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [bouquets, setBouquets] = useState<PurchasedBouquet[]>([]);
   const [customOrders, setCustomOrders] = useState<CustomOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReviewForm, setShowReviewForm] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/sign-in');
+      navigate('/signin');
       return;
     }
 
@@ -46,20 +33,7 @@ export default function Orders() {
   const fetchPurchaseHistory = async () => {
     setLoading(true);
     try {
-      // 1. Fetch purchased bouquets
-      const response = await fetch('/api/bouquets/all', {
-        credentials: 'include',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Filter only bouquets purchased by current logged in user
-        const userPurchases = (data || []).filter(
-          (b: PurchasedBouquet) => b.purchased_by === user?.id
-        );
-        setBouquets(userPurchases);
-      }
-
-      // 2. Fetch custom grab-and-go orders from localStorage
+      // Load custom grab-and-go orders from localStorage
       const savedCustom = JSON.parse(
         localStorage.getItem('fleurraine_custom_orders') || '[]'
       );
@@ -82,17 +56,7 @@ export default function Orders() {
     );
   }
 
-  // Combine both types of orders for display sorting by date
   const combinedHistory = [
-    ...bouquets.map((b) => ({
-      id: b.id,
-      type: 'bouquet',
-      title: `Numbered Bouquet #${b.bouquet_number}`,
-      price_cents: b.price_cents,
-      date: b.sold_at || b.uploaded_at,
-      image: `/api/storage/${b.storage_key_thumb}`,
-      description: b.description || 'Freshly assembled floral bouquet',
-    })),
     ...customOrders.map((o) => ({
       id: o.id,
       type: 'custom',
@@ -156,7 +120,6 @@ export default function Orders() {
               key={item.id}
               className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 items-center shadow-xs hover:border-accent/40 transition-colors"
             >
-              {/* Product Thumbnail (if bouquet) */}
               {item.image ? (
                 <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-50">
                   <img
@@ -172,7 +135,6 @@ export default function Orders() {
                 </div>
               )}
 
-              {/* Product Info */}
               <div className="flex-1">
                 <div className="flex flex-wrap justify-between items-start gap-1">
                   <h3 className="font-heading text-lg text-gray-900 font-semibold">

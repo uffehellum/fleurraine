@@ -6,6 +6,7 @@ WORKDIR /app/web
 # Read OAuth client IDs from .env file if not provided as build args
 ARG VITE_GOOGLE_CLIENT_ID
 ARG VITE_FACEBOOK_APP_ID
+ARG VITE_DEFAULT_PRICE=10
 
 # Copy .env files to extract OAuth IDs if needed
 COPY .env* ./
@@ -23,6 +24,7 @@ RUN if [ -z "$VITE_GOOGLE_CLIENT_ID" ] && [ -f ".env" ]; then \
 
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 ENV VITE_FACEBOOK_APP_ID=$VITE_FACEBOOK_APP_ID
+ENV VITE_DEFAULT_PRICE=$VITE_DEFAULT_PRICE
 
 COPY web/package.json web/package-lock.json* ./
 RUN npm ci

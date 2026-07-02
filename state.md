@@ -16,7 +16,7 @@ When an admin uploads a photo, it starts in the `pending` status. The AI classif
 stateDiagram-v2
     [*] --> Pending : Admin Upload
     Pending --> Scanning : AI Scan (Tigris Vision) & OSM Reverse Geocoding
-    Scanning --> AutoAssigned : AI Classifies Category (Stand, Bouquet, Flower, Garden Row)
+    Scanning --> AutoAssigned : AI Classifies Category (Stand, Flower, Garden Row)
     AutoAssigned --> Published : Admin Confirms (Published Status)
     AutoAssigned --> EditedByAdmin : Admin Overrides Category/Metadata
     EditedByAdmin --> Published : Admin Publishes
@@ -27,30 +27,7 @@ stateDiagram-v2
 
 ---
 
-### 1.2 Category: Bouquet Lifecycle
-A bouquet photo requires a **4-digit bouquet number** and a **price in cents**.
-
-```mermaid
-stateDiagram-v2
-    [*] --> Available : Uploaded (Status: Published)
-    Available --> Sold : Customer Purchases Bouquet
-    note right of Sold
-        Recorded Fields:
-        - purchased_by (User ID)
-        - sold_at (Timestamp)
-    end note
-    Available --> MovedToStand : Physically Moved to Stand
-    note right of MovedToStand
-        Photo remains categorized as Bouquet;
-        separate new overall photo of stand is taken.
-    end note
-    Available --> Discarded : Unsold/Expired Bouquet
-    Available --> Deleted : Admin Deletes
-```
-
----
-
-### 1.3 Category: Flower Stand (Chronological Status)
+### 1.2 Category: Flower Stand (Chronological Status)
 Flower stand images capture the physical state of the stand over time.
 
 ```mermaid
@@ -66,7 +43,7 @@ stateDiagram-v2
 
 ---
 
-### 1.4 Category: Flower (Species & Flower Catalog)
+### 1.3 Category: Flower (Species & Flower Catalog)
 Images representing specific flower types. Multiple flower types can exist in a single photo, stored in the `flower_names` array.
 
 ```mermaid
@@ -81,7 +58,7 @@ stateDiagram-v2
 
 ---
 
-### 1.5 Category: Garden Row
+### 1.4 Category: Garden Row
 Images tracking specific beds/rows in the garden. Multiple row numbers can exist in a single photo, stored in the `row_numbers` array.
 
 ```mermaid
@@ -96,17 +73,27 @@ stateDiagram-v2
 
 ---
 
-### 1.6 Summary of Photo States & Purchase Conditions
+### 1.5 Summary of Photo States
 
-Administrators can inspect the `status` and `purchased_by` columns in the database directly. The table below outlines how the system evaluates these states across the client views:
+| Database `status` | Category | Visibility in public galleries |
+| :--- | :--- | :--- |
+| **`pending`** | Any | Hidden (Admin Queue only) |
+| **`published`** | Any | **Visible** in public galleries |
+| **`replaced`** | Any | Hidden |
+| **`deleted`** | Any | Hidden (Loads deleted notice on deep link) |
 
-| Database `status` | `purchased_by` | Category | Visibility in public galleries | Purchase Button Visible |
-| :--- | :--- | :--- | :--- | :--- |
-| **`pending`** | `NULL` | Any | Hidden (Admin Queue only) | ❌ No |
-| **`published`** | `NULL` | `'bouquet'` | **Visible** in Bouquet Gallery | **✔️ Yes** (Only available state) |
-| **`published`** | `UUID` | `'bouquet'` | **Visible** in "All" tab (marked Sold) | ❌ No (Renders "Sold Out" banner) |
-| **`replaced`** | Any | Any | Hidden | ❌ No |
-| **`deleted`** | Any | Any | Hidden (Loads deleted notice on deep link) | ❌ No |
+### 1.6 Payment Flow
+
+Payments are handled via **Stripe Checkout** — a simple, public, no-login-required flow:
+
+1. Customer taps **"Buy Now"** on the home page
+2. Backend creates a Stripe Checkout Session with a fixed price + sales tax
+3. Customer is redirected to Stripe's hosted payment page
+4. **iPhone users** see Apple Pay as the first option (Stripe handles this automatically)
+5. **All users** can pay with credit/debit cards
+6. On success, Stripe sends a `checkout.session.completed` webhook to the backend
+
+No numbered bouquets, no hold/purchase state machine — just a simple payment for flowers.
 
 ---
 
@@ -202,19 +189,17 @@ Welcome to the **Fleurraine Flower Stand Companion App**! Use this guide to easi
 * **Flowers Catalog**: Tap the **Flowers** tab to see what species are currently in bloom. You can tap on any species (e.g., *Tulips*) to read its description and view historical catalog photos.
 * **Garden Map**: Tap the **Garden** tab to browse pictures organized by garden rows, letting you see exactly how the fields look and what rows are currently peaking.
 
-### 💐 5.2 Purchasing a Specific Numbered Bouquet
-1. Locate the physical bouquet at the stand and look for its **4-digit bouquet number** (e.g., `1204`).
-2. In the app, tap the **Bouquets** tab.
-3. Locate bouquet `#1204` or type it into the search bar.
-4. Review the details, price, and flower types included.
-5. Tap **Buy Now** to purchase using Stripe, credit card, or your digital wallet.
+### 💐 5.2 Paying for Flowers
+1. On the home page, tap **"Buy Now"**.
+2. You'll be redirected to Stripe's secure checkout page.
+3. On iPhone, Apple Pay appears as the first option. On other devices, enter your card details.
+4. Complete payment — no account needed!
 
-### 🍯 5.3 Quick Payment for a Unnumbered Bouquet or Flower Jar
-* If you selected a beautiful jar of loose flowers or an unnumbered bouquet from the physical stand:
-  1. Tap the **Quick Pay** button on the home screen or under the **Bouquets** tab.
-  2. Select the item category (e.g., "Flower Jar" or "Standard Bouquet").
-  3. Confirm the default price or enter the amount listed physically on the stand.
-  4. Complete payment securely in seconds.
+### 🍯 5.3 Terry's Corner (Pay in Person)
+* If you're at the physical stand and prefer to pay in person:
+  1. Tap **Terry's Corner** from the home page.
+  2. Scan the QR code or follow the Venmo instructions on the page.
+  3. Payment is handled in person — no app payment needed.
 
 ### 📦 5.4 Order History
 * Tap your profile icon or navigate to the **Orders** tab.
@@ -233,16 +218,7 @@ Help us grow and share your joy! Once you've purchased a bouquet:
 
 Use these copy-pasteable PostgreSQL query snippets to audit, monitor, and correct photo data states in the backend.
 
-### 6.1 View Active vs. Sold Bouquets
-Find all bouquets currently available on the stand versus those that have been sold.
-```sql
-SELECT id, bouquet_number, price_cents, status, sold_at, purchased_by 
-FROM photos 
-WHERE category = 'bouquet' AND deleted_at IS NULL
-ORDER BY bouquet_number ASC;
-```
-
-### 6.2 View Stand Photo History Chronology
+### 6.1 View Stand Photo History Chronology
 List all stand photos to verify chronological order and find the current homepage image.
 ```sql
 SELECT id, exif_taken_at, uploaded_at, status, storage_key_orig 
@@ -251,7 +227,7 @@ WHERE category = 'stand' AND deleted_at IS NULL
 ORDER BY COALESCE(exif_taken_at, uploaded_at) DESC;
 ```
 
-### 6.3 Find Photos Containing a Specific Flower Type
+### 6.2 Find Photos Containing a Specific Flower Type
 Query photos containing a specific flower type (utilizing the GIN index).
 ```sql
 SELECT id, category, flower_names, uploaded_at 
@@ -259,7 +235,7 @@ FROM photos
 WHERE 'Dahlia' = ANY(flower_names) AND deleted_at IS NULL;
 ```
 
-### 6.4 Find Photos Displaying a Specific Garden Row
+### 6.3 Find Photos Displaying a Specific Garden Row
 Query photos that belong to a specific garden bed (utilizing the GIN index).
 ```sql
 SELECT id, category, row_numbers, uploaded_at 
@@ -267,7 +243,7 @@ FROM photos
 WHERE 3 = ANY(row_numbers) AND deleted_at IS NULL;
 ```
 
-### 6.5 Correct a Mislabeled Category (e.g., Flower Type back to Stand)
+### 6.4 Correct a Mislabeled Category (e.g., Flower Type back to Stand)
 If an image was incorrectly categorized, run this query to re-designate it.
 ```sql
 UPDATE photos 
@@ -275,15 +251,7 @@ SET category = 'stand', flower_names = NULL, row_numbers = NULL
 WHERE id = 'INSERT-PHOTO-UUID-HERE';
 ```
 
-### 6.6 Manually Mark a Bouquet as Sold
-If a customer paid physically or offline, mark a bouquet as sold manually.
-```sql
-UPDATE photos 
-SET status = 'sold', sold_at = NOW(), purchased_by = 'INSERT-USER-UUID-HERE'
-WHERE id = 'INSERT-PHOTO-UUID-HERE' AND category = 'bouquet';
-```
-
-### 6.7 Restore a Accidentally Deleted Photo (Soft-delete rollback)
+### 6.5 Restore a Accidentally Deleted Photo (Soft-delete rollback)
 If an admin accidentally deleted a photo, restore its database record (Note: storage files must be re-uploaded since storage binaries are hard-deleted).
 ```sql
 UPDATE photos 

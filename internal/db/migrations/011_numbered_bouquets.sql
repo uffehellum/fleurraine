@@ -1,4 +1,4 @@
--- Migration 011: Add numbered bouquets support with Stripe Checkout integration
+1. -- Migration 011: Add numbered bouquets support with Stripe Checkout integration
 -- This enables the admin to photograph bouquets with 4-digit number stickers,
 -- which are automatically detected by AI and made available for purchase via Stripe.
 

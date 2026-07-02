@@ -129,20 +129,6 @@ func main() {
 		})
 	})
 
-	// ── Bouquet routes (numbered bouquets for sale) ──────────────────────────
-	r.Route("/api/bouquets", func(r chi.Router) {
-		// Public routes
-		r.Get("/available", photoHandlers.HandleGetAvailableBouquets)
-		r.Get("/all", photoHandlers.HandleGetAllBouquets)
-
-		// Protected routes (require authentication)
-		r.Group(func(r chi.Router) {
-			r.Use(auth.RequireAuth)
-			r.Post("/{id}/purchase", photoHandlers.HandlePurchaseBouquet)
-			r.Post("/{id}/hold", photoHandlers.HandleHoldBouquet)
-		})
-	})
-
 	// ── Storage proxy route (for serving images) ─────────────────────────────
 	r.Get("/api/storage/*", storageHandler.HandleGetImage)
 
@@ -175,6 +161,12 @@ func main() {
 		})
 	})
 
+	// ── Payment routes (Stripe Checkout — public, no login required) ──────────
+	r.Route("/api/payments", func(r chi.Router) {
+		r.Post("/checkout", payments.HandleCheckout)
+		r.Post("/webhook", payments.HandleWebhook)
+	})
+
 	// ── Serve React static assets from the embedded filesystem ───────────────
 	staticFS, err := fs.Sub(static, "static")
 	if err != nil {
@@ -199,12 +191,6 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("Starting Fleurraine server on %s", addr)
-
-	// ── Payment routes (Stripe Checkout) ──────────────────────────────────────
-	r.Route("/api/payments", func(r chi.Router) {
-		r.Post("/checkout", payments.HandleCheckout)
-		r.Post("/webhook", payments.HandleWebhook)
-	})
 
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("server error: %v", err)

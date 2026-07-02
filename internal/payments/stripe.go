@@ -49,7 +49,7 @@ func initStripe() error {
 // HandleCheckout creates a Stripe Checkout Session for purchasing a bouquet.
 //
 // POST /api/payments/checkout
-// Request body: {"amount": 1000, "label": "Bouquet from Fleur Raine"}
+// Request body: {"amount": 1000, "label": "Bouquet from Fleurraine"}
 //   - amount is in cents (e.g., 1000 = $10.00)
 //   - label is the product name shown on the Stripe Checkout page
 //
@@ -82,7 +82,7 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Label == "" {
-		req.Label = "Bouquet from Fleur Raine"
+		req.Label = "Bouquet from Fleurraine"
 	}
 
 	// Calculate tax: amount * rate, rounded to nearest cent.

@@ -43,12 +43,12 @@ export default function TerrysCorner() {
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6 text-center">
         <h2 className="text-xl font-serif text-rose-900 mb-4">Connect to the App</h2>
         <p className="text-gray-600 text-sm mb-4">
-          Scan this QR code to open the Fleur Raine app on your phone:
+          Scan this QR code to open the Fleurraine app on your phone:
         </p>
         <div className="flex justify-center mb-4">
           <img
             src={qrCodeUrl}
-            alt="QR code to open the Fleur Raine app"
+            alt="QR code to open the Fleurraine app"
             width={240}
             height={240}
             className="border border-gray-100 rounded"

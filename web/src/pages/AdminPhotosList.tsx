@@ -40,6 +40,7 @@ export default function AdminPhotosList() {
     try {
       const response = await fetch('/api/photos?limit=200', {
         credentials: 'include',
+        cache: 'no-store',
       });
 
       if (!response.ok) {
@@ -212,7 +213,6 @@ export default function AdminPhotosList() {
                     <td className="px-3 py-3 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         photo.category === 'stand' ? 'bg-blue-100 text-blue-800' :
-                        photo.category === 'bouquet' ? 'bg-pink-100 text-pink-800' :
                         photo.category === 'flower_type' ? 'bg-purple-100 text-purple-800' :
                         photo.category === 'garden_row' ? 'bg-green-100 text-green-800' :
                         'bg-gray-100 text-gray-800'

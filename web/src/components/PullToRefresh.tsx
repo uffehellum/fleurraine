@@ -5,12 +5,26 @@ interface PullToRefreshProps {
 }
 
 export default function PullToRefresh({ children }: PullToRefreshProps) {
+  // Visual state (triggers re-render for the indicator/content transform)
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
+  // Refs that the touch handlers read/write so listeners can stay stable
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
+  const pullDistanceRef = useRef(0);
+  const isRefreshingRef = useRef(false);
+
+  // Sync helper: update both the ref and the visual state
+  const setPull = (value: number) => {
+    pullDistanceRef.current = value;
+    setPullDistance(value);
+  };
+  const setRefreshing = (value: boolean) => {
+    isRefreshingRef.current = value;
+    setIsRefreshing(value);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -18,7 +32,7 @@ export default function PullToRefresh({ children }: PullToRefreshProps) {
 
     const handleTouchStart = (e: TouchEvent) => {
       // Only track if we are at the very top of the page
-      if (window.scrollY > 5 || isRefreshing) {
+      if (window.scrollY > 5 || isRefreshingRef.current) {
         touchStartRef.current = null;
         return;
       }
@@ -29,7 +43,7 @@ export default function PullToRefresh({ children }: PullToRefreshProps) {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!touchStartRef.current || !isDraggingRef.current || isRefreshing) return;
+      if (!touchStartRef.current || !isDraggingRef.current || isRefreshingRef.current) return;
 
       const touch = e.touches[0];
       const deltaX = touch.clientX - touchStartRef.current.x;
@@ -44,17 +58,16 @@ export default function PullToRefresh({ children }: PullToRefreshProps) {
           }
 
           // Apply elastic/spring resistance (damping)
-          // Uses log or exponent to make it feel naturally heavy as you pull lower
           const resistance = 0.4;
           const distance = deltaY * resistance;
-          
+
           // Clamp visual pull distance to 80px max
           const clampedDistance = Math.min(80, distance);
-          setPullDistance(clampedDistance);
+          setPull(clampedDistance);
         }
       } else if (deltaY < 0) {
         // Pulling up, cancel any pull down tracking
-        setPullDistance(0);
+        setPull(0);
         isDraggingRef.current = false;
       }
     };
@@ -64,9 +77,9 @@ export default function PullToRefresh({ children }: PullToRefreshProps) {
       isDraggingRef.current = false;
 
       // Threshold to trigger refresh
-      if (pullDistance >= 50 && !isRefreshing) {
-        setIsRefreshing(true);
-        setPullDistance(60); // Keep it visible at 60px while refreshing
+      if (pullDistanceRef.current >= 50 && !isRefreshingRef.current) {
+        setRefreshing(true);
+        setPull(60); // Keep it visible at 60px while refreshing
 
         // Trigger reload after brief animation delay for great UX
         setTimeout(() => {
@@ -74,7 +87,7 @@ export default function PullToRefresh({ children }: PullToRefreshProps) {
         }, 800);
       } else {
         // Snap back to 0
-        setPullDistance(0);
+        setPull(0);
       }
       touchStartRef.current = null;
     };
@@ -89,7 +102,7 @@ export default function PullToRefresh({ children }: PullToRefreshProps) {
       container.removeEventListener("touchmove", handleTouchMove);
       container.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [pullDistance, isRefreshing]);
+  }, []); // Stable listeners for the entire gesture lifecycle
 
   // Handle transition when resetting or locking
   const transitionStyle = isDraggingRef.current

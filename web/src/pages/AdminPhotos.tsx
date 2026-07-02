@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import ImageUpload from '../components/ImageUpload';
 
 interface Photo {
   id: string;
@@ -35,7 +36,6 @@ export default function AdminPhotos() {
   const { isAdmin } = useAuth();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pending' | 'published' | 'reviews'>('all');
   const [expandedPhoto, setExpandedPhoto] = useState<string | null>(null);
 
@@ -60,6 +60,7 @@ export default function AdminPhotos() {
 
       const response = await fetch(url, {
         credentials: 'include',
+        cache: 'no-store',
       });
 
       if (!response.ok) {
@@ -219,10 +220,7 @@ export default function AdminPhotos() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleFileUpload = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
@@ -234,8 +232,6 @@ export default function AdminPhotos() {
       alert('Image must be smaller than 32MB');
       return;
     }
-
-    setUploading(true);
 
     try {
       const formData = new FormData();
@@ -261,13 +257,8 @@ export default function AdminPhotos() {
 
       // Refresh the photo list
       fetchPhotos();
-      
-      // Reset the file input
-      e.target.value = '';
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -286,46 +277,12 @@ export default function AdminPhotos() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-heading text-3xl">Photo Management</h1>
         
-        {/* Inline upload button */}
-        <div>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="admin-photo-input"
-            disabled={uploading}
-          />
-          <label
-            htmlFor="admin-photo-input"
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-lg shadow-md cursor-pointer ${
-              uploading
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
-          >
-            {uploading ? (
-              <>
-                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Uploading...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Upload
-              </>
-            )}
-          </label>
-        </div>
+        {/* Upload button — uses ImageUpload for iOS PWA compatibility */}
+        <ImageUpload
+          onPhotoSelected={handleFileUpload}
+          label="Upload"
+          className="flex items-center gap-2"
+        />
       </div>
 
       {/* Filter tabs */}
@@ -407,7 +364,6 @@ export default function AdminPhotos() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         photo.category === 'stand' ? 'bg-blue-100 text-blue-800' :
-                        photo.category === 'bouquet' ? 'bg-pink-100 text-pink-800' :
                         photo.category === 'flower_type' ? 'bg-purple-100 text-purple-800' :
                         photo.category === 'garden_row' ? 'bg-green-100 text-green-800' :
                         'bg-gray-100 text-gray-800'
@@ -561,7 +517,6 @@ export default function AdminPhotos() {
                           className="w-full text-sm border rounded px-3 py-2"
                         >
                           <option value="stand">Stand</option>
-                          <option value="bouquet">Bouquet</option>
                           <option value="flower_type">Flower Type</option>
                           <option value="garden_row">Garden Row</option>
                           <option value="other">Other</option>

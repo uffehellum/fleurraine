@@ -10,12 +10,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	_ "image/gif"
 	"image/jpeg"
+	_ "image/png"
 	"io"
 	"math/bits"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"github.com/rwcarlsen/goexif/exif"
 
 	"github.com/uffehellum/fleurraine/internal/ai"
-	"github.com/uffehellum/fleurraine/internal/email"
 	"github.com/uffehellum/fleurraine/internal/storage"
 )
 
@@ -386,41 +386,10 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		fmt.Printf("photos: AI analysis failed: %v\n", err)
 	}
 
-	// Handle numbered bouquet detection and photo replacement
-	var replacedPhotoID *string
-	var bouquetNumber *int
-	var priceCents *int
+	// Store detected flowers from AI
 	var detectedFlowers []string
-
-	if aiResp != nil {
-		// Store detected flowers
-		if len(aiResp.DetectedFlowers) > 0 {
-			detectedFlowers = aiResp.DetectedFlowers
-		}
-
-		// If AI detected a numbered bouquet, handle it
-		if aiResp.IsNumberedBouquet && aiResp.BouquetNumber != nil {
-			bouquetNumber = aiResp.BouquetNumber
-			defaultPrice := 1500 // Default $15.00
-			if defaultPriceStr := os.Getenv("DEFAULT_BOUQUET_PRICE_CENTS"); defaultPriceStr != "" {
-				if dp, err := strconv.Atoi(defaultPriceStr); err == nil {
-					defaultPrice = dp
-				}
-			}
-			priceCents = &defaultPrice
-
-			// Check if this bouquet number already exists
-			existingPhoto, err := s.GetPhotoByBouquetNumber(ctx, *aiResp.BouquetNumber)
-			if err == nil && existingPhoto != nil {
-				// Replace the old photo with this new one
-				err = s.ReplacePhoto(ctx, existingPhoto.ID, "Replaced with better photo")
-				if err != nil {
-					fmt.Printf("photos: failed to replace photo: %v\n", err)
-				} else {
-					replacedPhotoID = &existingPhoto.ID
-				}
-			}
-		}
+	if aiResp != nil && len(aiResp.DetectedFlowers) > 0 {
+		detectedFlowers = aiResp.DetectedFlowers
 	}
 
 	// For reviews, verify the image contains flowers
@@ -541,7 +510,7 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 			flower_name, harvest_season, row_number, description,
 			uploaded_by, uploaded_at, published_at,
 			is_review, share_token, wikipedia_url, detected_location,
-			bouquet_number, price_cents, detected_flowers,
+			detected_flowers,
 			row_numbers, flower_names
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
@@ -550,7 +519,7 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 			$15, $16, $17, $18,
 			$19, now(), $20,
 			$21, $22, $23, $24,
-			$25, $26, $27, $28, $29
+			$25, $26, $27
 		)
 		RETURNING id, uploaded_at
 	`
@@ -588,7 +557,7 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		flowerName, harvestSeason, req.RowNumber, description,
 		req.UserID, publishedAt,
 		req.IsReview, shareToken, wikipediaURL, detectedLocationPtr,
-		bouquetNumber, priceCents, detectedFlowers,
+		detectedFlowers,
 		rowNumbers, flowerNames,
 	).Scan(&photoID, &uploadedAt)
 	if err != nil {
@@ -621,10 +590,7 @@ func (s *Service) UploadPhoto(ctx context.Context, req UploadRequest) (*Photo, e
 		ShareToken:       &shareToken,
 		WikipediaURL:     wikipediaURL,
 		DetectedLocation: detectedLocationPtr,
-		BouquetNumber:    bouquetNumber,
-		PriceCents:       priceCents,
 		DetectedFlowers:  detectedFlowers,
-		ReplacedPhotoID:  replacedPhotoID,
 	}, nil
 }
 
@@ -955,233 +921,6 @@ func (s *Service) ReanalyzePhoto(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetPhotoByBouquetNumber finds an active photo with the given bouquet number.
-func (s *Service) GetPhotoByBouquetNumber(ctx context.Context, number int) (*Photo, error) {
-	const query = `
-		SELECT id, category, bouquet_number, price_cents, storage_key_mobile, storage_key_thumb
-		FROM photos
-		WHERE bouquet_number = $1 
-		  AND deleted_at IS NULL 
-		  AND purchased_by IS NULL
-		LIMIT 1
-	`
-
-	var p Photo
-	err := s.db.QueryRow(ctx, query, number).Scan(
-		&p.ID, &p.Category, &p.BouquetNumber, &p.PriceCents,
-		&p.StorageKeyMobile, &p.StorageKeyThumb,
-	)
-	if err == pgx.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("photos: get by bouquet number: %w", err)
-	}
-	return &p, nil
-}
-
-// ReplacePhoto marks an old photo as replaced (soft delete).
-func (s *Service) ReplacePhoto(ctx context.Context, photoID string, reason string) error {
-	const query = `
-		UPDATE photos 
-		SET deleted_at = now(), 
-		    admin_notes = $2,
-		    status = 'replaced'
-		WHERE id = $1
-	`
-	_, err := s.db.Exec(ctx, query, photoID, reason)
-	if err != nil {
-		return fmt.Errorf("photos: replace photo: %w", err)
-	}
-	return nil
-}
-
-// UpdateBouquetInfo updates the bouquet number and price for a photo.
-func (s *Service) UpdateBouquetInfo(ctx context.Context, photoID string, bouquetNumber int, priceCents int) error {
-	const query = `
-		UPDATE photos
-		SET bouquet_number = $1, price_cents = $2
-		WHERE id = $3
-	`
-	_, err := s.db.Exec(ctx, query, bouquetNumber, priceCents, photoID)
-	if err != nil {
-		return fmt.Errorf("photos: update bouquet info: %w", err)
-	}
-	return nil
-}
-
-// GetAvailableBouquets returns all bouquets available for purchase.
-func (s *Service) GetAvailableBouquets(ctx context.Context) ([]*Photo, error) {
-	const query = `
-		SELECT id, bouquet_number, price_cents, storage_key_mobile, storage_key_thumb,
-		       description, exif_taken_at, detected_flowers, ai_analysis, uploaded_at
-		FROM photos
-		WHERE bouquet_number IS NOT NULL 
-		  AND purchased_by IS NULL 
-		  AND deleted_at IS NULL
-		  AND category = 'bouquet'
-		ORDER BY COALESCE(exif_taken_at, uploaded_at) DESC
-	`
-
-	rows, err := s.db.Query(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("photos: get available bouquets: %w", err)
-	}
-	defer rows.Close()
-
-	bouquets := make([]*Photo, 0)
-	for rows.Next() {
-		var p Photo
-		var detectedFlowersArray []string
-		var aiAnalysisJSON []byte
-
-		err := rows.Scan(
-			&p.ID, &p.BouquetNumber, &p.PriceCents, &p.StorageKeyMobile, &p.StorageKeyThumb,
-			&p.Description, &p.EXIFTakenAt, &detectedFlowersArray, &aiAnalysisJSON, &p.UploadedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("photos: scan bouquet row: %w", err)
-		}
-
-		p.DetectedFlowers = detectedFlowersArray
-
-		// Parse AI analysis JSON
-		if len(aiAnalysisJSON) > 0 {
-			json.Unmarshal(aiAnalysisJSON, &p.AIAnalysis)
-		}
-
-		bouquets = append(bouquets, &p)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return bouquets, nil
-}
-
-// GetAllBouquets returns all bouquets (available, sold, active).
-func (s *Service) GetAllBouquets(ctx context.Context) ([]*Photo, error) {
-	const query = `
-		SELECT id, bouquet_number, price_cents, storage_key_mobile, storage_key_thumb,
-		       description, exif_taken_at, detected_flowers, ai_analysis, uploaded_at,
-		       purchased_by, sold_at
-		FROM photos
-		WHERE bouquet_number IS NOT NULL 
-		  AND deleted_at IS NULL
-		  AND category = 'bouquet'
-		ORDER BY COALESCE(exif_taken_at, uploaded_at) DESC
-	`
-
-	rows, err := s.db.Query(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("photos: get all bouquets: %w", err)
-	}
-	defer rows.Close()
-
-	bouquets := make([]*Photo, 0)
-	for rows.Next() {
-		var p Photo
-		var detectedFlowersArray []string
-		var aiAnalysisJSON []byte
-
-		err := rows.Scan(
-			&p.ID, &p.BouquetNumber, &p.PriceCents, &p.StorageKeyMobile, &p.StorageKeyThumb,
-			&p.Description, &p.EXIFTakenAt, &detectedFlowersArray, &aiAnalysisJSON, &p.UploadedAt,
-			&p.PurchasedBy, &p.SoldAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("photos: scan bouquet row: %w", err)
-		}
-
-		p.DetectedFlowers = detectedFlowersArray
-
-		// Parse AI analysis JSON
-		if len(aiAnalysisJSON) > 0 {
-			json.Unmarshal(aiAnalysisJSON, &p.AIAnalysis)
-		}
-
-		bouquets = append(bouquets, &p)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return bouquets, nil
-}
-
-// HoldBouquet marks a bouquet as pending (Venmo hold) and triggers email.
-func (s *Service) HoldBouquet(ctx context.Context, id string, userID string, userEmail string, userName string) error {
-	// Get bouquet details first
-	photo, err := s.GetPhotoByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("photos: failed to find bouquet for hold: %w", err)
-	}
-	if photo == nil {
-		return fmt.Errorf("photos: bouquet not found")
-	}
-	if photo.Category != "bouquet" || photo.BouquetNumber == nil {
-		return fmt.Errorf("photos: photo is not a numbered bouquet")
-	}
-	if photo.Status != "published" {
-		return fmt.Errorf("photos: bouquet is not active for hold")
-	}
-	if photo.PurchasedBy != nil {
-		return fmt.Errorf("photos: bouquet is already sold")
-	}
-
-	// Place on hold by moving back to pending status
-	const query = `
-		UPDATE photos
-		SET status = 'pending'
-		WHERE id = $1 AND category = 'bouquet' AND status = 'published' AND purchased_by IS NULL
-	`
-	_, err = s.db.Exec(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("photos: failed to place hold: %w", err)
-	}
-
-	// Trigger Email Notification to Lorraine
-	adminEmail := os.Getenv("ADMIN_EMAIL")
-	if adminEmail == "" {
-		adminEmail = "lorraine.hellum@gmail.com"
-	}
-
-	subject := fmt.Sprintf("⏳ Venmo Hold: Bouquet #%d", *photo.BouquetNumber)
-	body := fmt.Sprintf(`Hi Lorraine,
-
-Customer %s (%s) has selected Bouquet #%d and has been redirected to Venmo to complete payment.
-
-The bouquet has been placed on a temporary "Pending" hold to prevent other customers from purchasing it. It is no longer visible on the stand.
-
-Please verify the payment on your Venmo account. Once confirmed, you can mark it as "Sold" or manually update its status from your Admin Queue.
-
-Best,
-Fleurraine System`, userName, userEmail, *photo.BouquetNumber)
-
-	err = email.Send(ctx, subject, body)
-	if err != nil {
-		fmt.Printf("Warning: failed to send hold email: %v\n", err)
-	}
-
-	return nil
-}
-
-// MarkBouquetSold marks a bouquet as sold after successful payment.
-func (s *Service) MarkBouquetSold(ctx context.Context, photoID string, userID string) error {
-	const query = `
-		UPDATE photos 
-		SET purchased_by = $1, sold_at = now()
-		WHERE id = $2 AND bouquet_number IS NOT NULL
-	`
-	_, err := s.db.Exec(ctx, query, userID, photoID)
-	if err != nil {
-		return fmt.Errorf("photos: mark bouquet sold: %w", err)
-	}
-	return nil
-}
-
 // ---- Helper functions ----------------------------------------------------
 
 // generateUUID generates a random UUID v4.
@@ -1316,85 +1055,17 @@ func autoOrientImage(img image.Image, orientation int) image.Image {
 	}
 }
 
-// PurchaseBouquet registers a successful purchase of a bouquet.
-func (s *Service) PurchaseBouquet(ctx context.Context, id string, userID string, userEmail string, userName string) error {
-	// 1. Fetch bouquet to verify availability
-	photo, err := s.GetPhotoByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("photos: failed to find bouquet for purchase: %w", err)
-	}
-	if photo == nil {
-		return fmt.Errorf("photos: bouquet not found")
-	}
-	if photo.Category != "bouquet" || photo.BouquetNumber == nil {
-		return fmt.Errorf("photos: photo is not a numbered bouquet")
-	}
-	if photo.PurchasedBy != nil {
-		return fmt.Errorf("photos: bouquet is already sold")
-	}
-
-	// 2. Mark as sold
-	err = s.MarkBouquetSold(ctx, id, userID)
-	if err != nil {
-		return fmt.Errorf("photos: failed to mark sold: %w", err)
-	}
-
-	// 3. Insert record into bouquet_purchases
-	paymentIntent := fmt.Sprintf("stripe_sim_%s", photo.ID)
-	const query = `
-		INSERT INTO bouquet_purchases (
-			photo_id, user_id, bouquet_number, stripe_payment_intent, amount_cents, status, completed_at, customer_email, customer_name
-		) VALUES (
-			$1, $2, $3, $4, $5, 'succeeded', now(), $6, $7
-		)
-	`
-	_, err = s.db.Exec(ctx, query, photo.ID, userID, *photo.BouquetNumber, paymentIntent, *photo.PriceCents, userEmail, userName)
-	if err != nil {
-		return fmt.Errorf("photos: failed to log purchase: %w", err)
-	}
-
-	// 4. Trigger Email Notification to Lorraine
-	adminEmail := os.Getenv("ADMIN_EMAIL")
-	if adminEmail == "" {
-		adminEmail = "lorraine.hellum@gmail.com"
-	}
-
-	subject := fmt.Sprintf("💐 Bouquet #%d Sold!", *photo.BouquetNumber)
-	body := fmt.Sprintf(`Hi Lorraine,
-
-Great news! Bouquet #%d has been purchased via Stripe.
-
-Customer Details:
-- Name: %s
-- Email: %s
-- Price Paid: $%.2f
-
-The bouquet has been marked as "sold" in your system and is no longer available on the site.
-
-Best,
-Fleurraine System`, *photo.BouquetNumber, userName, userEmail, float64(*photo.PriceCents)/100.0)
-
-	err = email.Send(ctx, subject, body)
-	if err != nil {
-		fmt.Printf("Warning: failed to send sale email: %v\n", err)
-	}
-
-	return nil
-}
-
 // UpdatePhotoMetadata updates photo metadata (for admin override).
-func (s *Service) UpdatePhotoMetadata(ctx context.Context, id string, category string, bouquetNumber *int, priceCents *int, flowerNames []string, rowNumbers []int32, description string) error {
+func (s *Service) UpdatePhotoMetadata(ctx context.Context, id string, category string, flowerNames []string, rowNumbers []int32, description string) error {
 	const query = `
 		UPDATE photos
 		SET category = $1,
-		    bouquet_number = $2,
-		    price_cents = $3,
-		    flower_names = $4,
-		    row_numbers = $5,
-		    description = $6
-		WHERE id = $7
+		    flower_names = $2,
+		    row_numbers = $3,
+		    description = $4
+		WHERE id = $5
 	`
-	_, err := s.db.Exec(ctx, query, category, bouquetNumber, priceCents, flowerNames, rowNumbers, description, id)
+	_, err := s.db.Exec(ctx, query, category, flowerNames, rowNumbers, description, id)
 	if err != nil {
 		return fmt.Errorf("photos: update photo metadata: %w", err)
 	}

@@ -18,7 +18,7 @@ interface StripeCheckoutButtonProps {
  */
 export default function StripeCheckoutButton({
   amount = env.DEFAULT_PRICE,
-  label = 'Bouquet from Fleur Raine',
+  label = 'Bouquet from Fleurraine',
   className = '',
 }: StripeCheckoutButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -64,19 +64,17 @@ export default function StripeCheckoutButton({
         type="button"
         onClick={handleCheckout}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#635BFF] text-white font-semibold rounded-lg hover:bg-[#5249E5] transition-colors disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 transition-colors disabled:opacity-50"
       >
         {loading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
         ) : (
           <>
-            <svg width="20" height="20" viewBox="0 0 60 25" fill="none" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M59.64 14.26h-8.06c.19 1.93 1.68 2.55 3.35 2.55 1.69 0 3.02-.36 4.07-.93v3.34c-1.13.63-2.63.97-4.55.97-4.06 0-7.05-2.53-7.05-7.03 0-4.37 2.76-7.08 6.56-7.08 3.81 0 5.99 2.65 5.99 6.62 0 .35-.04 1.1-.31 2.56zm-5.66-5.05c-1.07 0-2.27.76-2.27 2.73h4.56c0-1.97-1.21-2.73-2.29-2.73zM40.95 5.38c-1.42 0-2.34.74-2.85 1.51l-.14-1.23h-3.56v18.04h3.58l.42-3.22c.5.79 1.42 1.51 2.85 1.51 2.55 0 4.96-2.04 4.96-7.04 0-4.55-2.41-6.58-4.96-6.58zm-.76 10.12c-.83 0-1.34-.42-1.61-.93l-.02-5.32c.29-.55.81-.95 1.63-.95 1.27 0 1.81 1.27 1.81 3.59 0 2.41-.53 3.61-1.81 3.61zM30.32 5.38c-1.42 0-2.34.74-2.85 1.51l-.14-1.23h-3.56v18.04h3.58l.42-3.22c.5.79 1.42 1.51 2.85 1.51 2.55 0 4.96-2.04 4.96-7.04 0-4.55-2.41-6.58-4.96-6.58zm-.76 10.12c-.29.55-.81.95-1.63.95-1.27 0-1.81-1.2-1.81-3.61 0-2.32.54-3.59 1.81-3.59.83 0 1.34.4 1.63.95v5.3zM21.5 5.66l-.42 3.23c-.5-.79-1.42-1.51-2.85-1.51-2.55 0-4.96 2.03-4.96 6.58 0 5 2.41 7.04 4.96 7.04 1.42 0 2.34-.72 2.85-1.51l.14 1.23h3.56V5.66h-3.58zm-.42 10.12c-.29.55-.81.95-1.63.95-1.27 0-1.81-1.2-1.81-3.61 0-2.32.54-3.59 1.81-3.59.83 0 1.34.4 1.63.95v5.3z"
-              />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <circle cx="12" cy="13" r="3.5" />
             </svg>
-            Pay with Stripe · ${amount.toFixed(2)}
+            Buy Now · ${amount.toFixed(2)}
           </>
         )}
       </button>

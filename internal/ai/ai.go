@@ -24,13 +24,11 @@ type AnalyzeImageRequest struct {
 
 // AnalyzeImageResponse contains the AI's analysis result
 type AnalyzeImageResponse struct {
-	Category          string   `json:"category"`
-	Confidence        float64  `json:"confidence"`
-	Description       string   `json:"description"`
-	RawResponse       string   `json:"raw_response"`
-	IsNumberedBouquet bool     `json:"is_numbered_bouquet"`
-	BouquetNumber     *int     `json:"bouquet_number"`
-	DetectedFlowers   []string `json:"detected_flowers"`
+	Category        string   `json:"category"`
+	Confidence      float64  `json:"confidence"`
+	Description     string   `json:"description"`
+	RawResponse     string   `json:"raw_response"`
+	DetectedFlowers []string `json:"detected_flowers"`
 }
 
 // AnalyzeImage sends an image to Claude for analysis
@@ -58,30 +56,22 @@ func AnalyzeImage(ctx context.Context, req AnalyzeImageRequest) (*AnalyzeImageRe
 
 1. Category: Classify as ONE of these:
    - "stand" - A flower stand/display with cut flowers in buckets/vases for sale
-   - "bouquet" - A pre-arranged bouquet or bundle of cut flowers
    - "flower_type" - A close-up of a single flower or flower type
    - "garden_row" - Flowers growing in garden rows/beds
    - "other" - Anything else
 
-2. Numbered Bouquet Detection:
-   - Look for a visible 4-digit number (1000-9999) on a sticker, tag, or label
-   - This is typically on wrapped bouquets ready for sale
-
-3. Flower Identification:
+2. Flower Identification:
    - List the types of flowers you can identify in the image
    - Be specific (e.g., "roses", "lilies", "daisies", "baby's breath")
 
 Respond with ONLY a JSON object in this exact format:
 {
-  "category": "bouquet",
+  "category": "stand",
   "confidence": 0.95,
-  "description": "A mixed bouquet with roses and lilies",
-  "is_numbered_bouquet": true,
-  "bouquet_number": 1234,
+  "description": "A flower stand with buckets of fresh cut flowers",
   "detected_flowers": ["roses", "lilies", "baby's breath"]
 }
 
-If no number is visible, set "is_numbered_bouquet" to false and "bouquet_number" to null.
 If you cannot identify specific flowers, set "detected_flowers" to an empty array.
 The confidence should be 0.0 to 1.0.`
 	}
