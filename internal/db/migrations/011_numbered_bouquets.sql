@@ -1,6 +1,6 @@
--- Migration 011: Add numbered bouquets support with Apple Pay integration
+-- Migration 011: Add numbered bouquets support with Stripe Checkout integration
 -- This enables the admin to photograph bouquets with 4-digit number stickers,
--- which are automatically detected by AI and made available for purchase via Apple Pay.
+-- which are automatically detected by AI and made available for purchase via Stripe.
 
 -- Extend photos table for numbered bouquets
 ALTER TABLE photos ADD COLUMN bouquet_number INTEGER;
@@ -20,7 +20,7 @@ CREATE UNIQUE INDEX unique_active_bouquet_number
 CREATE INDEX ON photos(bouquet_number) WHERE bouquet_number IS NOT NULL;
 CREATE INDEX ON photos(category, bouquet_number) WHERE category = 'bouquet';
 
--- Payment tracking table for Stripe/Apple Pay transactions
+-- Payment tracking table for Stripe transactions
 CREATE TABLE bouquet_purchases (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   photo_id              UUID NOT NULL REFERENCES photos(id),

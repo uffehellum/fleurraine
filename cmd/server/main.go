@@ -18,6 +18,7 @@ import (
 
 	"github.com/uffehellum/fleurraine/internal/auth"
 	"github.com/uffehellum/fleurraine/internal/db"
+	"github.com/uffehellum/fleurraine/internal/payments"
 	"github.com/uffehellum/fleurraine/internal/photos"
 	"github.com/uffehellum/fleurraine/internal/storage"
 )
@@ -198,6 +199,13 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("Starting Fleurraine server on %s", addr)
+
+	// ── Payment routes (Stripe Checkout) ──────────────────────────────────────
+	r.Route("/api/payments", func(r chi.Router) {
+		r.Post("/checkout", payments.HandleCheckout)
+		r.Post("/webhook", payments.HandleWebhook)
+	})
+
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("server error: %v", err)
 	}

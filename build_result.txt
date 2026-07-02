@@ -1,0 +1,3 @@
+# github.com/uffehellum/fleurraine/cmd/server
+cmd/server/main.go:202:43: undefined: payments
+exit=1

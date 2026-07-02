@@ -1340,7 +1340,7 @@ func (s *Service) PurchaseBouquet(ctx context.Context, id string, userID string,
 	}
 
 	// 3. Insert record into bouquet_purchases
-	paymentIntent := fmt.Sprintf("apple_pay_sim_%s", photo.ID)
+	paymentIntent := fmt.Sprintf("stripe_sim_%s", photo.ID)
 	const query = `
 		INSERT INTO bouquet_purchases (
 			photo_id, user_id, bouquet_number, stripe_payment_intent, amount_cents, status, completed_at, customer_email, customer_name
@@ -1362,7 +1362,7 @@ func (s *Service) PurchaseBouquet(ctx context.Context, id string, userID string,
 	subject := fmt.Sprintf("💐 Bouquet #%d Sold!", *photo.BouquetNumber)
 	body := fmt.Sprintf(`Hi Lorraine,
 
-Great news! Bouquet #%d has been purchased via Apple Pay.
+Great news! Bouquet #%d has been purchased via Stripe.
 
 Customer Details:
 - Name: %s

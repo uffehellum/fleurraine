@@ -140,43 +140,41 @@ export default function BouquetDetail() {
     }
   };
 
-  const handleApplePay = async () => {
+  const handleStripeCheckout = async () => {
     if (!bouquet) return;
-    
-    if (!user) {
-      alert('Please sign in to complete your purchase.');
-      // Save current path to return back after authentication
-      localStorage.setItem('authReturnTo', window.location.pathname);
-      navigate('/sign-in');
-      return;
-    }
 
     if (bouquet.purchased_by) {
       alert('This bouquet has already been sold.');
       return;
     }
 
-    const confirmPurchase = window.confirm(`Confirm your purchase of Bouquet #${bouquet.bouquet_number} for $${(bouquet.price_cents / 100).toFixed(2)} with Apple Pay?`);
-    if (!confirmPurchase) return;
-
     setPurchasing(true);
 
     try {
-      const response = await fetch(`/api/bouquets/${id}/purchase`, {
+      const response = await fetch('/api/payments/checkout', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({
+          amount: bouquet.price_cents,
+          label: `Bouquet #${bouquet.bouquet_number}`,
+        }),
       });
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.error || 'Payment failed');
+        throw new Error(errData.error || 'Checkout failed');
       }
 
-      alert(`Thank you! You have successfully purchased Bouquet #${bouquet.bouquet_number}! An email confirmation has been sent to Lorraine.`);
-      fetchBouquet();
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
     } catch (err) {
-      console.error('Purchase failed:', err);
-      alert(err instanceof Error ? err.message : 'Purchase failed. Please try again.');
+      console.error('Stripe checkout failed:', err);
+      alert(err instanceof Error ? err.message : 'Checkout failed. Please try again.');
     } finally {
       setPurchasing(false);
     }
@@ -294,20 +292,22 @@ export default function BouquetDetail() {
         {/* Purchase options only show when published/active and not sold */}
         {bouquet.status === 'published' && !bouquet.purchased_by && (
           <>
-            {/* Apple Pay button */}
+            {/* Stripe checkout button */}
             <button
-              onClick={handleApplePay}
+              onClick={handleStripeCheckout}
               disabled={purchasing}
-              className="w-full text-white py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2 bg-black hover:bg-gray-800"
+              className="w-full text-white py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2 bg-[#635BFF] hover:bg-[#5249E5]"
             >
               {purchasing ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                  <path d="M3.5 9.5h17v5h-17z" opacity=".2"/>
+                  <path d="M20.5 10h-17a.5.5 0 00-.5.5v5a.5.5 0 00.5.5h17a.5.5 0 00.5-.5v-5a.5.5 0 00-.5-.5zM20 15H4v-4h16v4z"/>
+                  <path d="M6 12h2v2H6zm3 0h2v2H9zm3 0h2v2h-2z"/>
                 </svg>
               )}
-              Buy with Apple Pay
+              Pay with Stripe · ${(bouquet.price_cents / 100).toFixed(2)}
             </button>
 
             {/* Venmo button */}

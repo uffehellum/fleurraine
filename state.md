@@ -207,7 +207,7 @@ Welcome to the **Fleurraine Flower Stand Companion App**! Use this guide to easi
 2. In the app, tap the **Bouquets** tab.
 3. Locate bouquet `#1204` or type it into the search bar.
 4. Review the details, price, and flower types included.
-5. Tap **Buy Now** to purchase using Apple Pay, credit card, or your digital wallet.
+5. Tap **Buy Now** to purchase using Stripe, credit card, or your digital wallet.
 
 ### 🍯 5.3 Quick Payment for a Unnumbered Bouquet or Flower Jar
 * If you selected a beautiful jar of loose flowers or an unnumbered bouquet from the physical stand:
